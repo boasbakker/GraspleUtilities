@@ -1,0 +1,14 @@
+{
+  "manifest_version": 2,
+  "name": "Exercise LaTeX+Text -> Clipboard (Firefox)",
+  "version": "1.1",
+  "description": "Extract text + LaTeX from .exercise-wrapper and copy to clipboard (MV2 for Firefox)",
+  "permissions": ["activeTab", "tabs", "clipboardWrite"],
+  "browser_action": {
+    "default_title": "Copy exercise text and LaTeX",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "48": "icons/icon48.png"
+  }
+}
