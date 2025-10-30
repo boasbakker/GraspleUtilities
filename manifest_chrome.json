@@ -3,7 +3,15 @@
   "name": "Exercise LaTeX+Text -> Clipboard",
   "version": "1.1",
   "description": "Extract text + LaTeX from .exercise-wrapper and copy to clipboard",
-  "permissions": ["activeTab", "scripting", "clipboardWrite"],
+  "permissions": ["activeTab", "scripting", "clipboardWrite", "storage"],
+  "host_permissions": ["https://app.grasple.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://app.grasple.com/*"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "action": {
     "default_title": "Copy exercise text and LaTeX",
     "default_popup": "popup.html"
