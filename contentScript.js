@@ -553,7 +553,7 @@
     } catch (err) {
       return { status: 'error', message: String(err) };
     }
-  } // end injected function
+  }
 
   function injectButton() {
     // Check if we're on an exercise page
