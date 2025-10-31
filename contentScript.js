@@ -559,23 +559,23 @@
     // Check if we're on an exercise page
     if (!isExercisePage()) {
       buttonInjected = false;
-      return;
+      return false;
     }
 
-    if (buttonInjected) return;
+    if (buttonInjected) return true;
 
     // Find the target container (the first div in exercise-header-wrapper)
     const headerWrapper = document.querySelector('div.exercise-header-wrapper.d-flex.justify-content-between');
-    if (!headerWrapper) return;
+    if (!headerWrapper) return false;
 
     // Find the first child div (left side with the h1)
     const leftDiv = headerWrapper.querySelector('div.d-flex.align-items-center');
-    if (!leftDiv) return;
+    if (!leftDiv) return false;
 
     // Check if buttons already exist (in case of manual navigation)
     if (leftDiv.querySelector('[data-testid="copy-latex-button"]')) {
       buttonInjected = true;
-      return;
+      return true;
     }
 
     // Create and inject the buttons
@@ -586,35 +586,94 @@
     
     buttonInjected = true;
     console.log('Copy question and Ask ChatGPT buttons injected');
+    return true;
+  }
+
+  function pollingInjectButton() {
+    // Try immediate injection first
+    if (injectButton()) {
+      console.log('Buttons injected successfully on first attempt');
+      return;
+    }
+
+    // If immediate injection fails, set up polling
+    console.log('Initial injection failed, starting polling...');
+    let attempts = 0;
+    const maxAttempts = 100;
+    const intervalId = setInterval(() => {
+      attempts++;
+      console.log(`Polling attempt ${attempts}/${maxAttempts}`);
+      
+      if (injectButton()) {
+        clearInterval(intervalId);
+        console.log('Buttons injected successfully after polling');
+      } else if (attempts >= maxAttempts) {
+        clearInterval(intervalId);
+        console.log('Failed to inject buttons after 10 attempts');
+      }
+    }, 100);
   }
 
   // Handle hash changes (navigation in SPA)
   function handleHashChange() {
+    console.log('Hash changed, checking for exercise page...');
     if (isExercisePage()) {
-      buttonInjected = false;
-      injectButton();
+      // Check if buttons actually exist in the DOM
+      const headerWrapper = document.querySelector('div.exercise-header-wrapper.d-flex.justify-content-between');
+      const leftDiv = headerWrapper ? headerWrapper.querySelector('div.d-flex.align-items-center') : null;
+      const copyButtonExists = leftDiv ? leftDiv.querySelector('[data-testid="copy-latex-button"]') : null;
+      const chatGPTButtonExists = leftDiv ? leftDiv.querySelector('[data-testid="ask-chatgpt-button"]') : null;
+      
+      // Only inject if either button is missing
+      if (!copyButtonExists || !chatGPTButtonExists) {
+        buttonInjected = false;
+        pollingInjectButton(); // Use polling injection for navigation changes
+      }
     } else {
       buttonInjected = false;
     }
   }
 
+  function injectHistoryOverride() {
+    const script = document.createElement('script');
+    script.textContent = `
+      (function() {
+        const originalPushState = history.pushState;
+        history.pushState = function(...args) {
+          console.log('pushState called with:', args);
+          // Call the original function
+          const result = originalPushState.apply(this, args);
+          // Dispatch a custom event that your content script can listen to
+          window.dispatchEvent(new CustomEvent('pushstate', { detail: args }));
+          return result;
+        };
+      })();
+    `;
+    (document.head || document.documentElement).appendChild(script);
+    script.remove();
+}
+
+
   // Listen for hash changes
   window.addEventListener('hashchange', handleHashChange);
+  window.addEventListener("pushstate", handleHashChange);
+  window.addEventListener("popstate", handleHashChange);
 
   // Try to inject immediately
   injectButton();
+  injectHistoryOverride()
 
   // Also observe DOM changes in case the page loads dynamically
-  const observer = new MutationObserver((mutations) => {
-    if (isExercisePage() && !buttonInjected) {
-      injectButton();
-    }
-  });
+  // const observer = new MutationObserver((mutations) => {
+  //   if (isExercisePage() && !buttonInjected) {
+  //     injectButton();
+  //   }
+  // });
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+  // observer.observe(document.body, {
+  //   childList: true,
+  //   subtree: true
+  // });
 
   // Don't disconnect the observer since we need it for SPA navigation
 
