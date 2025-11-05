@@ -1,9 +1,8 @@
-name: Zip & release on tag
+name: Zip & release on every push
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: ["**"]    # run on every branch push; change to ["main"] if you only want main
 
 permissions:
   contents: write
@@ -12,20 +11,25 @@ jobs:
   zip-and-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set variables
+      - name: Prepare names
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          ZIP_NAME="${{ github.repository }}-${TAG}.zip"
+          # short sha (7 chars)
+          SHORT_SHA=${GITHUB_SHA:0:7}
+          ZIP_NAME="${{ github.repository }}-${SHORT_SHA}.zip"
+          RELEASE_TAG="run-${SHORT_SHA}"
+          RELEASE_NAME="Auto-release ${SHORT_SHA} (${GITHUB_REF_NAME})"
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
-          echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
-          echo "RELEASE_NAME=Release $TAG" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
 
-      - name: Create zip
-        run: zip -r "$ZIP_NAME" . -x ".git/*" "node_modules/*" "dist/*" "__pycache__/*"
+      - name: Create zip (exclude .git and common dev folders)
+        run: |
+          zip -r "$ZIP_NAME" . -x ".git/*" "node_modules/*" "dist/*" "__pycache__/*"
 
-      - name: Create GitHub release and upload zip
+      - name: Create GitHub release and upload zip (ncipollo/release-action@v1)
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ env.RELEASE_TAG }}
