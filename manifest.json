@@ -21,9 +21,6 @@
     "default_title": "Copy exercise text and LaTeX",
     "default_popup": "popup.html"
   },
-  "icons": {
-    "48": "icons/icon48.png"
-  },
   "browser_specific_settings": {
     "gecko": {
       "id": "temp@example.com"
