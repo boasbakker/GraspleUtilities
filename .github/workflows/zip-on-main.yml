@@ -26,9 +26,10 @@ jobs:
           echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
           echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
 
-      - name: Create zip (exclude .git and common dev folders)
+      - name: Create zip (exclude .git and .github)
         run: |
-          zip -r "$ZIP_NAME" . -x ".git/*" ".github/*" ".gitattributes"
+          # Zip all files/folders in the current directory, not the current dir itself
+          zip -r "$ZIP_NAME" ./* -x ".git/*" ".github/*" "*.git*" ".gitattributes"
 
       - name: Create GitHub release and upload zip (ncipollo/release-action@v1)
         uses: ncipollo/release-action@v1
