@@ -1,8 +1,8 @@
-name: Zip & release on every push
+name: Zip & release on every push (contents at root, exclude .gitattributes)
 
 on:
   push:
-    branches: ["**"]    # run on every branch push; change to ["main"] if you only want main
+    branches: ["**"]    # runs on every branch push; change to ["main"] to limit to main
 
 permissions:
   contents: write
@@ -16,7 +16,6 @@ jobs:
 
       - name: Prepare names
         run: |
-          # short sha (7 chars)
           SHORT_SHA=${GITHUB_SHA:0:7}
           SAFE_REPO_NAME=$(echo "${GITHUB_REPOSITORY}" | tr "/" "-")
           ZIP_NAME="${SAFE_REPO_NAME}-${SHORT_SHA}.zip"
@@ -26,10 +25,13 @@ jobs:
           echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
           echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
 
-      - name: Create zip (exclude .git and .github)
+      - name: Create zip of repository contents (no top-level folder) excluding .gitattributes
         run: |
-          # Zip all files/folders in the current directory, not the current dir itself
-          zip -r "$ZIP_NAME" ./* -x ".git/*" ".github/*" "*.git*" ".gitattributes"
+          cd "$GITHUB_WORKSPACE"
+          # include dotfiles, zip repository contents (not the parent folder),
+          # and exclude git metadata, workflow files and .gitattributes
+          shopt -s dotglob
+          zip -r "$ZIP_NAME" * -x ".git/*" ".github/*" ".gitattributes"
 
       - name: Create GitHub release and upload zip (ncipollo/release-action@v1)
         uses: ncipollo/release-action@v1
