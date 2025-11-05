@@ -28,7 +28,7 @@ jobs:
 
       - name: Create zip (exclude .git and common dev folders)
         run: |
-          zip -r "$ZIP_NAME" . -x ".git/*" "node_modules/*" "dist/*" "__pycache__/*"
+          zip -r "$ZIP_NAME" . -x ".git/*" ".github/*" ".gitattributes"
 
       - name: Create GitHub release and upload zip (ncipollo/release-action@v1)
         uses: ncipollo/release-action@v1
