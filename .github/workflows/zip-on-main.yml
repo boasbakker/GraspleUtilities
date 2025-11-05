@@ -18,7 +18,8 @@ jobs:
         run: |
           # short sha (7 chars)
           SHORT_SHA=${GITHUB_SHA:0:7}
-          ZIP_NAME="${{ github.repository }}-${SHORT_SHA}.zip"
+          SAFE_REPO_NAME=$(echo "${GITHUB_REPOSITORY}" | tr "/" "-")
+          ZIP_NAME="${SAFE_REPO_NAME}-${SHORT_SHA}.zip"
           RELEASE_TAG="run-${SHORT_SHA}"
           RELEASE_NAME="Auto-release ${SHORT_SHA} (${GITHUB_REF_NAME})"
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
