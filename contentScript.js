@@ -226,13 +226,6 @@
     const NL2 = NL + NL;
 
     try {
-      // Block tags which should introduce line breaks (preserve original structure)
-      const BLOCK_TAGS = new Set([
-        'p','div','li','ul','ol','br','fieldset','legend','section','article',
-        'header','footer','address','aside','h1','h2','h3','h4','h5','h6',
-        'table','tr','td','th','pre','blockquote'
-      ]);
-
       function isElementVisible(el) {
         if (!(el instanceof Element)) return false;
         const style = window.getComputedStyle(el);
@@ -245,7 +238,8 @@
       function isIgnoredElement(el) {
         if (!(el instanceof Element)) return false;
         const tag = el.tagName ? el.tagName.toLowerCase() : '';
-        if (tag === 'grapp-question-header') return true;
+        // EDIT: Added grapp-question-answer-input-template to ignored elements
+        if (tag === 'grapp-question-answer-input-template') return true;
         try {
           if (el.matches && el.matches('div.exercise-header-wrapper.d-flex.justify-content-between')) return true;
           if (el.matches && el.matches('p.fs-7.fst-italic')) return true;
@@ -260,23 +254,15 @@
         let txt = ann && ann.textContent ? ann.textContent : (el.textContent || '');
         txt = txt.replace(/\\displaystyle\s*/g, '');
         if (stripDecorative) {
-          // convert spacing macros to a single normal space
-          txt = txt.replace(/\\ /g, ' ');
-          txt = txt.replace(/\\,/g, ' ');
-          txt = txt.replace(/\\;/g, ' ');
-          txt = txt.replace(/\\:/g, ' ');
-          txt = txt.replace(/\\!/g, ' ');
-          txt = txt.replace(/\\,/g, ' ');
+          txt = txt.replace(/\\ /g, ' ').replace(/\\,/g, ' ').replace(/\\;/g, ' ').replace(/\\:/g, ' ').replace(/\\!/g, ' ').replace(/\\,/g, ' ');
           txt = txt.replace(/\\(?:quad|qquad|thinspace|enspace|,)\b/g, ' ');
-          // remove \left and \right entirely
           txt = txt.replace(/\\left\b/g, '').replace(/\\right\b/g, '');
-          // conservative removal of mkern-like tokens into space
           txt = txt.replace(/\\mkern[^{]*\{?[^}]*\}?/g, ' ');
         }
-        return txt.replace(/\s+/g, ' ').trim();
+        const cleanedTxt = txt.replace(/\s+/g, ' ').trim();
+        return cleanedTxt ? `$${cleanedTxt}$` : '';
       }
 
-      // pieces array collects strings; we use '\n' internally and normalize to CRLF at the end.
       const pieces = [];
 
       function pushRaw(s) {
@@ -284,350 +270,201 @@
         pieces.push(String(s));
       }
 
-      // Add a normalized text piece: if it contains newlines, preserve them; otherwise collapse whitespace.
-      function pushPiecePreserveNewlines(s) {
+      function pushPiece(s) {
         if (s === null || s === undefined) return;
-        let str = String(s);
-        if (/\r?\n/.test(str)) {
-          // normalize each line's internal whitespace, keep \n separators
-          const lines = str.split(/\r?\n/).map(l => l.replace(/\s+/g, ' ').trim());
-          const joined = lines.join('\n').trim();
-          if (joined) pieces.push(joined);
-        } else {
-          const compact = str.replace(/\s+/g, ' ').trim();
-          if (compact) pieces.push(compact);
-        }
+        const compact = String(s).replace(/\s+/g, ' ').trim();
+        if (compact) pieces.push(compact);
       }
-
-      // Push a raw block that already contains \n between its lines (used for MCQ block)
+      
       function pushRawBlockWithLF(s) {
         if (s === null || s === undefined) return;
-        const str = String(s);
-        const lines = str.split(/\r?\n/).map(l => l.replace(/\s+/g, ' ').trim());
+        const lines = String(s).split(/\r?\n/).map(l => l.replace(/\s+/g, ' ').trim());
         const joined = lines.join('\n').trim();
         if (joined) pieces.push(joined);
       }
 
-      // Traverse DOM but insert newline markers for block boundaries to preserve original structure.
+      // EDIT: Reworked traversal logic for more precise newline control
+      const MINOR_BREAK_TAGS = new Set([
+          'p', 'li', 'div', 'tr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'blockquote'
+      ]);
+
       function traverse(node) {
         if (!node) return;
+
         if (node.nodeType === Node.TEXT_NODE) {
           const parent = node.parentElement;
-          if (!parent || !isElementVisible(parent)) return;
-          if (isIgnoredElement(parent)) return;
+          if (!parent || !isElementVisible(parent) || isIgnoredElement(parent)) return;
           const tag = parent.tagName ? parent.tagName.toUpperCase() : '';
           if (tag === 'SCRIPT' || tag === 'STYLE') return;
-          pushPiecePreserveNewlines(node.nodeValue);
+          pushPiece(node.nodeValue);
           return;
         }
 
         if (node.nodeType === Node.ELEMENT_NODE) {
           const el = node;
-          if (!isElementVisible(el)) return;
-          if (isIgnoredElement(el)) return;
+          if (!isElementVisible(el) || isIgnoredElement(el)) return;
 
           const tagName = el.tagName ? el.tagName.toLowerCase() : '';
 
-          // If this element is a block tag, insert a newline marker BEFORE content (unless last piece already ends with newline)
-          if (BLOCK_TAGS.has(tagName) && tagName !== 'br') {
-            // add single LF marker to represent a block boundary
+          // Handle major breaks for new sub-questions
+          if (tagName === 'grapp-question-header') {
+            pushRaw('\n\n'); // Use double newline as a separator
+            return; // Don't process header's content
+          }
+
+          // Handle minor breaks (paragraphs, lists) with a single newline
+          if (MINOR_BREAK_TAGS.has(tagName)) {
             pushRaw('\n');
           }
 
-          // Special-case MCQ component
+          if (tagName === 'br') {
+              pushRaw('\n');
+              return;
+          }
+
           if (tagName === 'grapp-multiple-choice-single-answer') {
             const optionTexts = [];
-
-            // Prefer radios and their labels
             const radios = el.querySelectorAll('input[type="radio"], input[type="checkbox"], [data-testid="answer-radio-input"]');
-            if (radios && radios.length > 0) {
+            if (radios.length > 0) {
               radios.forEach(radio => {
                 const label = radio.closest('label') || radio.closest('[data-testid="mc-answer"]') || radio.parentElement;
                 if (!label) return;
                 const candidate = label.querySelector('.user-provided-html') || label.querySelector('.question-mc-answer-input') || label;
-                // extractTextFromElement with collapseWhitespace=true to get compact option text
                 const txt = (() => {
-                  // local extraction: collect visible text inside candidate
                   const partsLocal = [];
                   (function walkLocal(n) {
                     if (!n) return;
                     if (n.nodeType === Node.TEXT_NODE) {
-                      const p = n.parentElement;
-                      if (!p || !isElementVisible(p)) return;
-                      if (isIgnoredElement(p)) return;
-                      const tag = p.tagName ? p.tagName.toUpperCase() : '';
-                      if (tag === 'SCRIPT' || tag === 'STYLE') return;
-                      partsLocal.push(n.nodeValue);
-                      return;
-                    }
-                    if (n.nodeType === Node.ELEMENT_NODE) {
-                      const ee = n;
-                      if (!isElementVisible(ee)) return;
-                      if (isIgnoredElement(ee)) return;
-                      if (ee.classList && ee.classList.contains('katex')) {
-                        partsLocal.push(extractKatexTex(ee));
-                        return;
-                      }
+                      const p = n.parentElement; if (p && isElementVisible(p) && !isIgnoredElement(p)) partsLocal.push(n.nodeValue);
+                    } else if (n.nodeType === Node.ELEMENT_NODE) {
+                      const ee = n; if (!isElementVisible(ee) || isIgnoredElement(ee)) return;
+                      if (ee.classList.contains('katex')) { partsLocal.push(extractKatexTex(ee)); return; }
                       for (let c = ee.firstChild; c; c = c.nextSibling) walkLocal(c);
                     }
                   })(candidate);
-                  const joined = partsLocal.join('');
-                  return joined.replace(/\s+/g, ' ').trim();
+                  return partsLocal.join('').replace(/\s+/g, ' ').trim();
                 })();
                 if (txt) optionTexts.push(txt);
               });
-            } else {
-              // fallback to mc-answer blocks
-              const blocks = el.querySelectorAll('[data-testid="mc-answer"], .question-mc-answer-input, li');
-              if (blocks && blocks.length > 0) {
-                blocks.forEach(b => {
-                  const text = (function extractBlockText(bEl) {
-                    const partsLocal = [];
-                    (function w(n) {
-                      if (!n) return;
-                      if (n.nodeType === Node.TEXT_NODE) {
-                        const p = n.parentElement;
-                        if (!p || !isElementVisible(p)) return;
-                        if (isIgnoredElement(p)) return;
-                        partsLocal.push(n.nodeValue);
-                        return;
-                      }
-                      if (n.nodeType === Node.ELEMENT_NODE) {
-                        const ee = n;
-                        if (!isElementVisible(ee)) return;
-                        if (isIgnoredElement(ee)) return;
-                        if (ee.classList && ee.classList.contains('katex')) {
-                          partsLocal.push(extractKatexTex(ee));
-                          return;
-                        }
-                        for (let c = ee.firstChild; c; c = c.nextSibling) w(c);
-                      }
-                    })(bEl);
-                    return partsLocal.join('').replace(/\s+/g, ' ').trim();
-                  })(b);
-                  if (text) optionTexts.push(text);
-                });
-              } else {
-                // final fallback: flatten visible text under component and try to split heuristically
-                const fallbackParts = [];
-                (function collectAll(n) {
-                  if (!n) return;
-                  if (n.nodeType === Node.TEXT_NODE) {
-                    const p = n.parentElement;
-                    if (!p || !isElementVisible(p)) return;
-                    if (isIgnoredElement(p)) return;
-                    fallbackParts.push(n.nodeValue);
-                    return;
-                  }
-                  if (n.nodeType === Node.ELEMENT_NODE) {
-                    const ee = n;
-                    if (!isElementVisible(ee)) return;
-                    if (isIgnoredElement(ee)) return;
-                    if (ee.classList && ee.classList.contains('katex')) {
-                      fallbackParts.push(extractKatexTex(ee));
-                      return;
-                    }
-                    for (let c = ee.firstChild; c; c = c.nextSibling) collectAll(c);
-                  }
-                })(el);
-                const fb = fallbackParts.join('').replace(/\s+/g, ' ').trim();
-                if (fb) {
-                  const splits = fb.split(/\s{2,}| - |—|•|\n/).map(s => s.trim()).filter(Boolean);
-                  if (splits.length > 1) splits.forEach(s => optionTexts.push(s));
-                  else optionTexts.push(fb);
-                }
-              }
             }
-
-            // dedupe contiguous duplicates
-            const deduped = [];
-            for (let i = 0; i < optionTexts.length; i++) {
-              if (i === 0 || optionTexts[i] !== optionTexts[i - 1]) deduped.push(optionTexts[i]);
-            }
-
+            const deduped = [...new Set(optionTexts.filter(Boolean))];
             if (deduped.length > 0) {
               const header = 'This is a multiple choice question. Choose one of the answers below:';
               const lines = deduped.map(it => '- ' + it);
-              const mcqBlockLF = header + '\n' + lines.join('\n');
-              pushRawBlockWithLF(mcqBlockLF);
+              pushRawBlockWithLF(header + '\n' + lines.join('\n'));
             }
-
-            // insert a block newline after the MCQ component to separate it from following content
-            pushRaw('\n');
-            return; // do not descend into MCQ children further
-          }
-
-          // If element is .katex (outside MCQ), extract its LaTeX text
-          if (el.classList && el.classList.contains('katex')) {
-            const t = extractKatexTex(el);
-            if (t) pushPiecePreserveNewlines(t);
-            return;
-          }
-
-          // If BR tag, add newline marker
-          if (tagName === 'br') {
             pushRaw('\n');
             return;
           }
 
-          // Otherwise descend children normally
+          if (el.classList.contains('katex')) {
+            pushPiece(extractKatexTex(el));
+            return;
+          }
+
           for (let child = el.firstChild; child; child = child.nextSibling) traverse(child);
-
-          // After processing a block element, add a newline marker to preserve paragraph separations
-          if (BLOCK_TAGS.has(tagName) && tagName !== 'br') {
-            pushRaw('\n');
-          }
         }
-      } // end traverse
+      }
 
-      // start from wrapper
       const root = document.querySelector('div.position-relative.exercise-wrapper');
       if (!root) return { status: 'no-target', message: 'No .exercise-wrapper found' };
 
       traverse(root);
 
-      // Now normalize collected pieces.
-      // Pieces may contain '\n' (LF) tokens; normalize each piece per-line, then convert to CRLF and join
-      const normalizedPieces = pieces.map(p => {
-        if (!p) return '';
-        const s = String(p);
-        if (/\r?\n/.test(s)) {
-          return s.split(/\r?\n/).map(line => line.replace(/\s+/g, ' ').trim()).join('\n').trim();
-        }
-        return s.replace(/\s+/g, ' ').trim();
-      }).filter(Boolean);
-
-      // Combine: if either piece contains newline, separate with two CRLFs; else single space.
+      // Assemble the final text from pieces
       let finalText = '';
-      for (let i = 0; i < normalizedPieces.length; i++) {
-        const piece = normalizedPieces[i];
+      for (let i = 0; i < pieces.length; i++) {
+        const piece = pieces[i];
         if (!piece) continue;
+
         if (finalText === '') {
-          finalText = piece;
+            finalText = piece;
+            continue;
+        }
+
+        const lastChar = finalText.slice(-1);
+        const nextChar = piece[0];
+
+        if (lastChar === '\n' || nextChar === '\n') {
+          finalText += piece;
         } else {
-          if (/\r?\n/.test(finalText) || /\r?\n/.test(piece)) {
-            finalText = finalText + NL2 + piece;
-          } else {
-            finalText = finalText + ' ' + piece;
-          }
+          finalText += ' ' + piece;
         }
       }
 
-      // Convert any remaining LF to CRLF
-      finalText = finalText.replace(/\r?\n/g, NL);
+      // Final cleanup
+      finalText = finalText.replace(/\n /g, '\n'); // Clean spaces after newlines
+      finalText = finalText.replace(/(\n){3,}/g, '\n\n'); // Collapse excess blank lines
+      finalText = finalText.replace(/\r?\n/g, NL); // Normalize to CRLF
+      finalText = finalText.trim();
 
-      // Collapse 3+ CRLFs into exactly two CRLFs (i.e., at most one empty line between blocks)
-      finalText = finalText.replace(/(\r\n){3,}/g, NL2);
-
-      // Trim leading/trailing whitespace/newlines but keep a single trailing newline structure unchanged if present
-      finalText = finalText.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '').trim();
-
-      // Final normalization: ensure internal multiple spaces are single (but not across preserved newlines)
-      // Already normalized per-line above, so we can trust spacing.
-
-      // Copy to clipboard (navigator.clipboard attempted synchronously during user gesture)
-      try {
-        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-          navigator.clipboard.writeText(finalText).catch(() => {});
-          return { status: 'copied', text: finalText };
-        }
-      } catch (e) {}
-
-      // Fallback execCommand
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = finalText;
-        ta.setAttribute('readonly', '');
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.documentElement.appendChild(ta);
-        ta.select();
-        const ok = document.execCommand('copy');
-        document.documentElement.removeChild(ta);
-        if (ok) return { status: 'copied', text: finalText };
-        return { status: 'failed', message: 'execCommand copy failed' };
-      } catch (err) {
-        return { status: 'error', message: String(err) };
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(finalText);
+        return { status: 'copied', text: finalText };
       }
+      
+      const ta = document.createElement('textarea');
+      ta.value = finalText;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.documentElement.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.documentElement.removeChild(ta);
+      if (ok) return { status: 'copied', text: finalText };
+      return { status: 'failed', message: 'execCommand copy failed' };
 
     } catch (err) {
+      console.error("Extraction error:", err);
       return { status: 'error', message: String(err) };
     }
   }
 
   function injectButton() {
-    // Check if we're on an exercise page
     if (!isExercisePage()) {
       buttonInjected = false;
       return false;
     }
-
     if (buttonInjected) return true;
-
-    // Find the target container (the first div in exercise-header-wrapper)
     const headerWrapper = document.querySelector('div.exercise-header-wrapper.d-flex.justify-content-between');
     if (!headerWrapper) return false;
-
-    // Find the first child div (left side with the h1)
     const leftDiv = headerWrapper.querySelector('div.d-flex.align-items-center');
     if (!leftDiv) return false;
-
-    // Check if buttons already exist (in case of manual navigation)
     if (leftDiv.querySelector('[data-testid="copy-latex-button"]')) {
       buttonInjected = true;
       return true;
     }
-
-    // Create and inject the buttons
     const copyButton = createCopyButton();
     const chatGPTButton = createAskChatGPTButton();
     leftDiv.appendChild(copyButton);
     leftDiv.appendChild(chatGPTButton);
-    
     buttonInjected = true;
     console.log('Copy question and Ask ChatGPT buttons injected');
     return true;
   }
 
   function pollingInjectButton() {
-    // Try immediate injection first
     if (injectButton()) {
-      console.log('Buttons injected successfully on first attempt');
       return;
     }
-
-    // If immediate injection fails, set up polling
-    console.log('Initial injection failed, starting polling...');
     let attempts = 0;
     const maxAttempts = 100;
     const intervalId = setInterval(() => {
       attempts++;
-      console.log(`Polling attempt ${attempts}/${maxAttempts}`);
-      
-      if (injectButton()) {
+      if (injectButton() || attempts >= maxAttempts) {
         clearInterval(intervalId);
-        console.log('Buttons injected successfully after polling');
-      } else if (attempts >= maxAttempts) {
-        clearInterval(intervalId);
-        console.log('Failed to inject buttons after 10 attempts');
       }
     }, 100);
   }
 
-  // Handle hash changes (navigation in SPA)
   function handleHashChange() {
-    console.log('Hash changed, checking for exercise page...');
     if (isExercisePage()) {
-      // Check if buttons actually exist in the DOM
       const headerWrapper = document.querySelector('div.exercise-header-wrapper.d-flex.justify-content-between');
-      const leftDiv = headerWrapper ? headerWrapper.querySelector('div.d-flex.align-items-center') : null;
-      const copyButtonExists = leftDiv ? leftDiv.querySelector('[data-testid="copy-latex-button"]') : null;
-      const chatGPTButtonExists = leftDiv ? leftDiv.querySelector('[data-testid="ask-chatgpt-button"]') : null;
-      
-      // Only inject if either button is missing
-      if (!copyButtonExists || !chatGPTButtonExists) {
+      const copyButtonExists = headerWrapper ? headerWrapper.querySelector('[data-testid="copy-latex-button"]') : null;
+      if (!copyButtonExists) {
         buttonInjected = false;
-        pollingInjectButton(); // Use polling injection for navigation changes
+        pollingInjectButton();
       }
     } else {
       buttonInjected = false;
@@ -636,45 +473,15 @@
 
   function injectHistoryOverride() {
     const script = document.createElement('script');
-    script.textContent = `
-      (function() {
-        const originalPushState = history.pushState;
-        history.pushState = function(...args) {
-          console.log('pushState called with:', args);
-          // Call the original function
-          const result = originalPushState.apply(this, args);
-          // Dispatch a custom event that your content script can listen to
-          window.dispatchEvent(new CustomEvent('pushstate', { detail: args }));
-          return result;
-        };
-      })();
-    `;
+    script.textContent = `(function() { const o=history.pushState;history.pushState=function(...a){const r=o.apply(this,a);return window.dispatchEvent(new CustomEvent('pushstate',{detail:a})),r}})();`;
     (document.head || document.documentElement).appendChild(script);
     script.remove();
-}
+  }
 
-
-  // Listen for hash changes
   window.addEventListener('hashchange', handleHashChange);
   window.addEventListener("pushstate", handleHashChange);
   window.addEventListener("popstate", handleHashChange);
-
-  // Try to inject immediately
-  injectButton();
-  injectHistoryOverride()
-
-  // Also observe DOM changes in case the page loads dynamically
-  // const observer = new MutationObserver((mutations) => {
-  //   if (isExercisePage() && !buttonInjected) {
-  //     injectButton();
-  //   }
-  // });
-
-  // observer.observe(document.body, {
-  //   childList: true,
-  //   subtree: true
-  // });
-
-  // Don't disconnect the observer since we need it for SPA navigation
+  injectHistoryOverride();
+  pollingInjectButton();
 
 })();
