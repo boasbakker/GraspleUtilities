@@ -1,8 +1,9 @@
-name: Zip & release on main push
+name: Zip & release on tag
 
 on:
   push:
-    branches: ["main"]   # runs when commits are pushed to main
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
@@ -13,19 +14,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup names
+      - name: Set variables
         run: |
-          SHA=${{ github.sha }}
-          ZIP_NAME="${{ github.repository }}-${SHA:0:7}.zip"
+          TAG=${GITHUB_REF#refs/tags/}
+          ZIP_NAME="${{ github.repository }}-${TAG}.zip"
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
-          echo "RELEASE_TAG=run-${SHA}" >> $GITHUB_ENV
-          echo "RELEASE_NAME=Auto-release ${SHA:0:7}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
+          echo "RELEASE_NAME=Release $TAG" >> $GITHUB_ENV
 
       - name: Create zip
-        run: zip -r "$ZIP_NAME" . -x ".git/*" "node_modules/*" "dist/*"
+        run: zip -r "$ZIP_NAME" . -x ".git/*" "node_modules/*" "dist/*" "__pycache__/*"
 
-      - name: Create or update release and upload asset
-        uses: ncipollo/release-action@v2
+      - name: Create GitHub release and upload zip
+        uses: ncipollo/release-action@v1
         with:
           tag: ${{ env.RELEASE_TAG }}
           name: ${{ env.RELEASE_NAME }}
