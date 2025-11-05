@@ -25,13 +25,18 @@ jobs:
           echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
           echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
 
-      - name: Create zip of repository contents (no top-level folder) excluding .gitattributes
+      - name: Create zip of repository contents (no top-level folder)
         run: |
           cd "$GITHUB_WORKSPACE"
-          # include dotfiles, zip repository contents (not the parent folder),
-          # and exclude git metadata, workflow files and .gitattributes
-          shopt -s dotglob
-          zip -r "$ZIP_NAME" * -x ".git/*" ".github/*" ".gitattributes"
+          # include dotfiles in glob and avoid literal * when empty
+          shopt -s dotglob nullglob
+          files=(*)                        # all files & folders in repo root
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No files to zip!"
+            exit 1
+          fi
+          # create zip from the list of files so entries are repo contents (not a containing folder)
+          zip -r "$ZIP_NAME" "${files[@]}" -x ".git/*" ".github/*" ".gitattributes" "$ZIP_NAME"
 
       - name: Create GitHub release and upload zip (ncipollo/release-action@v1)
         uses: ncipollo/release-action@v1
