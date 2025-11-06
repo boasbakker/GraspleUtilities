@@ -425,15 +425,12 @@
     if (!isExercisePage()) {
       return false;
     }
-    // Check if buttons are already injected using document.getElementById
-    if (document.getElementById('grasple-copy-button') && document.getElementById('grasple-ask-chatgpt-button')) {
-      return true;
-    }
     const headerWrapper = document.querySelector('div.exercise-header-wrapper.d-flex.justify-content-between');
     if (!headerWrapper) return false;
     const leftDiv = headerWrapper.querySelector('div.d-flex.align-items-center');
     if (!leftDiv) return false;
-    if (leftDiv.querySelector('[data-testid="copy-latex-button"]')) {
+    // Check if buttons are already injected using document.getElementById
+    if (document.getElementById('grasple-copy-button') && document.getElementById('grasple-ask-chatgpt-button')) {
       return true;
     }
     const copyButton = createCopyButton();
