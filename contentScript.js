@@ -341,6 +341,7 @@
             }
             const deduped = [...new Set(optionTexts.filter(Boolean))];
             if (deduped.length > 0) {
+              pushRaw('\n');
               const header = 'This is a multiple choice question. Choose one of the answers below:';
               const lines = deduped.map(it => '- ' + it);
               pushRawBlockWithLF(header + '\n' + lines.join('\n'));
