@@ -104,15 +104,11 @@
     }
   }
 
-  // Flag to ensure we only inject once per page view
-  let buttonInjected = false;
+  // A unique ID for the button container to prevent re-injection.
+  const BUTTON_CONTAINER_ID = 'grasple-tools-button-container'; // <-- NEW
+
   console.log("Grasple Tools: Initializing...");
 
-  // Check if we're on an exercise page (hash-based routing)
-  function isExercisePage() {
-    const hash = window.location.hash;
-    return /\/exercises\/\d+/.test(hash);
-  }
 
   function createCopyButton() {
     const button = document.createElement('button');
@@ -429,15 +425,8 @@
    * Checks if buttons should be injected and performs the injection.
    */
   function runInjectionCheck() {
-    // If we are not on an exercise page, reset the flag and do nothing.
-    // This allows re-injection if the user navigates back to an exercise page.
-    if (!isExercisePage()) {
-      buttonInjected = false;
-      return;
-    }
-
-    // If we are on an exercise page but the button is already there, do nothing.
-    if (buttonInjected) {
+    // Check if our buttons are already injected. If so, do nothing. // <-- CHANGED
+    if (document.getElementById(BUTTON_CONTAINER_ID)) {
       return;
     }
 
@@ -452,21 +441,18 @@
       return; // Target's child not ready yet.
     }
     
-    // Check again to prevent double-injection in race conditions.
-    if (leftDiv.querySelector('[data-testid="copy-latex-button"]')) {
-      buttonInjected = true;
-      return;
-    }
+    // Create a container for our buttons with the unique ID. // <-- NEW
+    const buttonContainer = document.createElement('span');
+    buttonContainer.id = BUTTON_CONTAINER_ID;
 
-    // Create and inject the buttons.
-    const copyButton = createCopyButton();
-    const chatGPTButton = createAskChatGPTButton();
-    leftDiv.appendChild(copyButton);
-    leftDiv.appendChild(chatGPTButton);
+    // Add buttons to the container. // <-- NEW
+    buttonContainer.appendChild(createCopyButton());
+    buttonContainer.appendChild(createAskChatGPTButton());
     
-    // Set the flag to true and log success.
-    buttonInjected = true;
-    console.log('Grasple Tools: Copy and Ask ChatGPT buttons injected.');
+    // Add the container to the page. // <-- NEW
+    leftDiv.appendChild(buttonContainer);
+    
+    console.log('Grasple Tools: Buttons injected.');
   }
 
   // Set up the MutationObserver to watch for page changes.
@@ -483,7 +469,7 @@
     subtree: true
   });
 
-  // Run the check once on script load, in case the page is already fully loaded.
+  // Run the check once on script load.
   runInjectionCheck();
 
 })();
