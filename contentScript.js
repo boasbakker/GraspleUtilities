@@ -104,9 +104,9 @@
     }
   }
 
-  // Flag to ensure we only inject once
+  // Flag to ensure we only inject once per page view
   let buttonInjected = false;
-  console.log("Hi!")
+  console.log("Grasple Tools: Initializing...");
 
   // Check if we're on an exercise page (hash-based routing)
   function isExercisePage() {
@@ -206,25 +206,23 @@
     return button;
   }
 
-  function extractQuestionText() {
+  async function extractQuestionText() {
     try {
       // Get the setting and extract question text
-      return configGet('stripDecorative').then(stripDecorative => {
-        const result = extractAndCopy(stripDecorative);
-        if (result.status === 'copied' && result.text) {
-          return { status: 'success', text: result.text };
-        }
-        return { status: 'failed', message: 'Could not extract question' };
-      });
+      const stripDecorative = await configGet('stripDecorative');
+      const result = await extractAndCopy(stripDecorative, false); // Pass false to not copy to clipboard
+      if (result.status === 'extracted' && result.text) {
+        return { status: 'success', text: result.text };
+      }
+      return { status: 'failed', message: 'Could not extract question' };
     } catch (err) {
-      return Promise.resolve({ status: 'error', message: String(err) });
+      return { status: 'error', message: String(err) };
     }
   }
 
-  function extractAndCopy(stripDecorative) {
+  async function extractAndCopy(stripDecorative, doCopy = true) {
     const NL = '\r\n';
-    const NL2 = NL + NL;
-
+    
     try {
       function isElementVisible(el) {
         if (!(el instanceof Element)) return false;
@@ -238,7 +236,6 @@
       function isIgnoredElement(el) {
         if (!(el instanceof Element)) return false;
         const tag = el.tagName ? el.tagName.toLowerCase() : '';
-        // EDIT: Added grapp-question-answer-input-template to ignored elements
         if (tag === 'grapp-question-answer-input-template') return true;
         try {
           if (el.matches && el.matches('div.exercise-header-wrapper.d-flex.justify-content-between')) return true;
@@ -283,7 +280,6 @@
         if (joined) pieces.push(joined);
       }
 
-      // EDIT: Reworked traversal logic for more precise newline control
       const MINOR_BREAK_TAGS = new Set([
           'p', 'li', 'div', 'tr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'blockquote'
       ]);
@@ -398,8 +394,12 @@
       finalText = finalText.replace(/\r?\n/g, NL); // Normalize to CRLF
       finalText = finalText.trim();
 
+      if (!doCopy) {
+        return { status: 'extracted', text: finalText };
+      }
+
       if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        navigator.clipboard.writeText(finalText);
+        await navigator.clipboard.writeText(finalText);
         return { status: 'copied', text: finalText };
       }
       
@@ -420,68 +420,70 @@
       return { status: 'error', message: String(err) };
     }
   }
+  
+  // =========================================================================
+  // NEW INJECTION TRIGGER LOGIC using MutationObserver
+  // =========================================================================
 
-  function injectButton() {
+  /**
+   * Checks if buttons should be injected and performs the injection.
+   */
+  function runInjectionCheck() {
+    // If we are not on an exercise page, reset the flag and do nothing.
+    // This allows re-injection if the user navigates back to an exercise page.
     if (!isExercisePage()) {
       buttonInjected = false;
-      return false;
+      return;
     }
-    if (buttonInjected) return true;
+
+    // If we are on an exercise page but the button is already there, do nothing.
+    if (buttonInjected) {
+      return;
+    }
+
+    // Find the target element to inject the buttons into.
     const headerWrapper = document.querySelector('div.exercise-header-wrapper.d-flex.justify-content-between');
-    if (!headerWrapper) return false;
+    if (!headerWrapper) {
+      return; // Target not on page yet, wait for next DOM change.
+    }
+    
     const leftDiv = headerWrapper.querySelector('div.d-flex.align-items-center');
-    if (!leftDiv) return false;
+    if (!leftDiv) {
+      return; // Target's child not ready yet.
+    }
+    
+    // Check again to prevent double-injection in race conditions.
     if (leftDiv.querySelector('[data-testid="copy-latex-button"]')) {
       buttonInjected = true;
-      return true;
+      return;
     }
+
+    // Create and inject the buttons.
     const copyButton = createCopyButton();
     const chatGPTButton = createAskChatGPTButton();
     leftDiv.appendChild(copyButton);
     leftDiv.appendChild(chatGPTButton);
+    
+    // Set the flag to true and log success.
     buttonInjected = true;
-    console.log('Copy question and Ask ChatGPT buttons injected');
-    return true;
+    console.log('Grasple Tools: Copy and Ask ChatGPT buttons injected.');
   }
 
-  function pollingInjectButton() {
-    if (injectButton()) {
-      return;
-    }
-    let attempts = 0;
-    const maxAttempts = 100;
-    const intervalId = setInterval(() => {
-      attempts++;
-      if (injectButton() || attempts >= maxAttempts) {
-        clearInterval(intervalId);
-      }
-    }, 100);
-  }
+  // Set up the MutationObserver to watch for page changes.
+  // This is more reliable than listening for URL changes in a Single Page App.
+  const observer = new MutationObserver((mutations) => {
+    // For any change, run our injection check. The check itself is smart
+    // enough to not re-inject if the button is already there.
+    runInjectionCheck();
+  });
 
-  function handleHashChange() {
-    if (isExercisePage()) {
-      const headerWrapper = document.querySelector('div.exercise-header-wrapper.d-flex.justify-content-between');
-      const copyButtonExists = headerWrapper ? headerWrapper.querySelector('[data-testid="copy-latex-button"]') : null;
-      if (!copyButtonExists) {
-        buttonInjected = false;
-        pollingInjectButton();
-      }
-    } else {
-      buttonInjected = false;
-    }
-  }
+  // Start observing the entire body for changes in the element tree.
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
 
-  function injectHistoryOverride() {
-    const script = document.createElement('script');
-    script.textContent = `(function() { const o=history.pushState;history.pushState=function(...a){const r=o.apply(this,a);return window.dispatchEvent(new CustomEvent('pushstate',{detail:a})),r}})();`;
-    (document.head || document.documentElement).appendChild(script);
-    script.remove();
-  }
-
-  window.addEventListener('hashchange', handleHashChange);
-  window.addEventListener("pushstate", handleHashChange);
-  window.addEventListener("popstate", handleHashChange);
-  injectHistoryOverride();
-  pollingInjectButton();
+  // Run the check once on script load, in case the page is already fully loaded.
+  runInjectionCheck();
 
 })();
