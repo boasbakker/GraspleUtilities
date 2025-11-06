@@ -104,8 +104,6 @@
     }
   }
 
-  // Flag to ensure we only inject once
-  let buttonInjected = false;
   console.log("Hi!")
 
   // Check if we're on an exercise page (hash-based routing)
@@ -116,6 +114,7 @@
 
   function createCopyButton() {
     const button = document.createElement('button');
+    button.id = 'grasple-copy-button';
     button.textContent = 'Copy question';
     button.className = 'btn btn-outline-primary btn-sm';
     button.style.marginRight = '8px';
@@ -161,6 +160,7 @@
 
   function createAskChatGPTButton() {
     const button = document.createElement('button');
+    button.id = 'grasple-ask-chatgpt-button';
     button.textContent = 'Ask ChatGPT';
     button.className = 'btn btn-outline-primary btn-sm';
     button.style.marginRight = '8px';
@@ -423,23 +423,23 @@
 
   function injectButton() {
     if (!isExercisePage()) {
-      buttonInjected = false;
       return false;
     }
-    if (buttonInjected) return true;
+    // Check if buttons are already injected using document.getElementById
+    if (document.getElementById('grasple-copy-button') && document.getElementById('grasple-ask-chatgpt-button')) {
+      return true;
+    }
     const headerWrapper = document.querySelector('div.exercise-header-wrapper.d-flex.justify-content-between');
     if (!headerWrapper) return false;
     const leftDiv = headerWrapper.querySelector('div.d-flex.align-items-center');
     if (!leftDiv) return false;
     if (leftDiv.querySelector('[data-testid="copy-latex-button"]')) {
-      buttonInjected = true;
       return true;
     }
     const copyButton = createCopyButton();
     const chatGPTButton = createAskChatGPTButton();
     leftDiv.appendChild(copyButton);
     leftDiv.appendChild(chatGPTButton);
-    buttonInjected = true;
     console.log('Copy question and Ask ChatGPT buttons injected');
     return true;
   }
@@ -460,14 +460,12 @@
 
   function handleHashChange() {
     if (isExercisePage()) {
-      const headerWrapper = document.querySelector('div.exercise-header-wrapper.d-flex.justify-content-between');
-      const copyButtonExists = headerWrapper ? headerWrapper.querySelector('[data-testid="copy-latex-button"]') : null;
-      if (!copyButtonExists) {
-        buttonInjected = false;
+      // Check if buttons are already injected using document.getElementById
+      const copyButtonExists = document.getElementById('grasple-copy-button');
+      const chatGPTButtonExists = document.getElementById('grasple-ask-chatgpt-button');
+      if (!copyButtonExists || !chatGPTButtonExists) {
         pollingInjectButton();
       }
-    } else {
-      buttonInjected = false;
     }
   }
 
