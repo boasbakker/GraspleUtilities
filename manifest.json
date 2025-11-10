@@ -5,11 +5,15 @@
   "description": "Extract text + LaTeX from .exercise-wrapper and copy to clipboard (MV3 for Firefox)",
   "permissions": [
     "clipboardWrite",
-    "storage"
+    "storage",
+    "webRequest"
   ],
   "host_permissions": [
     "https://app.grasple.com/*"
   ],
+  "background": {
+    "scripts": ["background.js"]
+  },
   "content_scripts": [
     {
       "matches": ["https://app.grasple.com/*"],
