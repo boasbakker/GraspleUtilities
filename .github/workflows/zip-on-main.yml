@@ -1,0 +1,40 @@
+name: Zip & release on every push
+
+on:
+  push:
+    branches: ["**"]    # run on every branch push; change to ["main"] if you only want main
+
+permissions:
+  contents: write
+
+jobs:
+  zip-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare names
+        run: |
+          # short sha (7 chars)
+          SHORT_SHA=${GITHUB_SHA:0:7}
+          SAFE_REPO_NAME=$(echo "${GITHUB_REPOSITORY}" | tr "/" "-")
+          ZIP_NAME="${SAFE_REPO_NAME}-${SHORT_SHA}.zip"
+          RELEASE_TAG="run-${SHORT_SHA}"
+          RELEASE_NAME="Auto-release ${SHORT_SHA} (${GITHUB_REF_NAME})"
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+
+      - name: Create zip (exclude .git and common dev folders)
+        run: |
+          zip -r "$ZIP_NAME" . -x ".git/*" ".github/*" ".gitattributes"
+
+      - name: Create GitHub release and upload zip (ncipollo/release-action@v1)
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_NAME }}
+          files: ${{ env.ZIP_NAME }}
+          draft: false
+          prerelease: false
