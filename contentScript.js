@@ -237,6 +237,45 @@
     }
   }
 
+  /**
+   * Get answer data for a specific question ID from the background script
+   * @param {number} questionId - The ID of the question to get the answer for
+   * @param {number} timestamp - Optional timestamp to wait for requests before this time
+   * @returns {Promise<object|null>} Answer data object or null if not found
+   * 
+   * Answer format for open questions:
+   * { id, type: "open", hint: string, answer: string }
+   * 
+   * Answer format for multiple choice:
+   * { id, type: "mc", choices: [{id, answer, explanation, isCorrect}] }
+   */
+  async function getAnswerById(questionId, timestamp = Date.now()) {
+    try {
+      if (!api || !api.runtime) {
+        console.error('Runtime API not available');
+        return null;
+      }
+
+      // Send message to background script to get answer
+      const response = await api.runtime.sendMessage({
+        type: 'GET_ANSWER',
+        questionId: questionId,
+        timestamp: timestamp
+      });
+
+      if (response && response.status === 'success') {
+        return response.answer;
+      } else {
+        console.log('Answer not found for question ID:', questionId);
+        return null;
+      }
+    } catch (err) {
+      console.error('Failed to get answer:', err);
+      return null;
+    }
+  }
+  window.getAnswerById = getAnswerById; // Expose for testing
+
   async function extractAndCopy(stripDecorative, doCopy = true) {
     const NL = '\r\n';
     
@@ -439,9 +478,6 @@
     }
   }
   
-  // =========================================================================
-  // NEW INJECTION TRIGGER LOGIC using MutationObserver
-  // =========================================================================
 
   /**
    * Checks if buttons should be injected and performs the injection.
@@ -449,7 +485,7 @@
   function runInjectionCheck() {
     // Check if our buttons are already injected. If so, do nothing. // <-- CHANGED
     if (document.getElementById(BUTTON_CONTAINER_ID)) {
-      return;
+      return true;
     }
 
     // Find the target element to inject the buttons into.
@@ -476,23 +512,70 @@
     leftDiv.appendChild(buttonContainer);
     
     console.log('Grasple Tools: Buttons injected.');
+    return true
+  }
+
+  /**
+   * Polls runInjectionCheck every 100ms until it returns true or 5 seconds have passed.
+   */
+  function pollingInjectionCheck() {
+    const startTime = Date.now();
+    const maxDuration = 5000; // 5 seconds
+    const pollInterval = 100; // 100ms
+    
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      
+      // Check if we've exceeded the maximum duration
+      if (elapsed >= maxDuration) {
+        clearInterval(intervalId);
+        console.log('Grasple Tools: Polling timed out after 5 seconds.');
+        return;
+      }
+      
+      // Try to inject and check if successful
+      const injected = runInjectionCheck();
+      if (injected) {
+        clearInterval(intervalId);
+        console.log('Grasple Tools: Polling completed successfully.');
+      }
+    }, pollInterval);
   }
 
   // Set up the MutationObserver to watch for page changes.
   // This is more reliable than listening for URL changes in a Single Page App.
-  const observer = new MutationObserver((mutations) => {
+  // const observer = new MutationObserver((mutations) => {
     // For any change, run our injection check. The check itself is smart
     // enough to not re-inject if the button is already there.
-    runInjectionCheck();
-  });
+    // runInjectionCheck();
+  // });
 
   // Start observing the entire body for changes in the element tree.
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+  // observer.observe(document.body, {
+  //   childList: true,
+  //   subtree: true
+  // });
 
   // Run the check once on script load.
   runInjectionCheck();
 
+  // Listen for messages from background script
+  if (api && api.runtime && api.runtime.onMessage) {
+    api.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'GRASPLE_API_REQUEST_COMPLETED') {
+        // console.log('=== Grasple API Request Event (from background) ===');
+        // console.log('URL:', message.data.url);
+        // console.log('Method:', message.data.method);
+        // console.log('Status Code:', message.data.statusCode);
+        // console.log('Request ID:', message.data.requestId);
+        // console.log('Timestamp:', message.data.timestamp);
+        // console.log('===================================================');
+      }
+      console.log("grasple received api response containing question data, running polling injection (url: " + message.data.url + " )")
+      pollingInjectionCheck()
+    });
+  }
+  
+
 })();
+

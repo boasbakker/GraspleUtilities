@@ -6,7 +6,8 @@
   "permissions": [
     "clipboardWrite",
     "storage",
-    "webRequest"
+    "webRequest",
+    "scripting"
   ],
   "host_permissions": [
     "https://app.grasple.com/*"

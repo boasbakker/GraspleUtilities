@@ -10,3 +10,11 @@ The extension should work on any modern browser, both Chromium-based (Google Chr
 - Copy question and ask it to an AI (ChatGPT or Gemini 2.5 Pro)
 - Enable/disable copying of decorative LaTeX
 
+
+# Authentication
+We need to make some requests to get data. Grasple authenticates requests with the Authorization header, as follows:
+```
+Authorization: John%20Malkovich {token} {id}
+```
+
+`token` and `id` are stored in a stringified object in localStorage["session_storage].

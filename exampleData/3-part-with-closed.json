@@ -1,0 +1,133 @@
+{
+	"challenge": {
+		"id": 63606,
+		"question": "<p>Determine&nbsp;\\(a,\\ b\\) and&nbsp;\\(f\\left(x\\right)\\) in this setting.</p>",
+		"description": "<p>Consider&nbsp;\\(R_n=\\sum_{i=1}^n\\frac{1}{n}\\cdot\\ln\\left(5 +3 \\cdot\\frac{i}{n}\\right)\\).</p><p>Look at&nbsp;\\(R_n\\) as the Riemann sum of the form&nbsp;\\(\\sum_{i=1}^nf\\left(c_i\\right)\\cdot\\Delta x\\)&nbsp;that converges to the integral&nbsp;\\(\\int_a^bf\\left(x\\right)dx\\) if we refine the partition (i.e. if&nbsp;\\(\\Delta x\\rightarrow0\\)).</p><p>Take as tags:&nbsp;\\(c_i=i\\cdot\\Delta x\\) with&nbsp;\\(\\Delta x=\\frac{1}{n}\\) and&nbsp;\\(i=1,2,...,n\\).</p>",
+		"answer_input_template": "<p>\\(a=\\)<answer-field ref=\"student.answer1\" class=\"inline-grow\"/></p><p>\\(b=\\)<answer-field ref=\"student.answer1.1\" class=\"inline-grow\"/></p><p>\\(f\\left(x\\right)=\\)<answer-field ref=\"student.answer1.2\" class=\"inline-grow\"/></p>",
+		"correct_answer": null,
+		"check_type": null,
+		"feedback": "<p>In general, for tags that are points in subintervals of equal size:</p><p>\\(\\sum_{i=1}^{n}f\\left(c_{i}\\right)\\cdot\\Delta x\\ \\rightarrow\\ \\int_{a}^{b}f\\left(x\\right)\\,dx\\)<strong>&nbsp;</strong>if&nbsp;\\(\\Delta x\\ \\rightarrow\\ 0\\) (refine the partition).<br>&nbsp;</p><p>Then:</p><ul><li>\\(\\Delta x=\\frac{b-a}{n}\\)&nbsp;(so&nbsp;\\(\\Delta x\\ \\rightarrow\\ 0\\) comes down to \\(n\\ \\rightarrow\\ \\infty\\)). Partition:&nbsp;\\(\\left[a,b\\right]\\) is divided in&nbsp;\\(n\\) subintervals of the same length.</li><li>\\(c_i\\in\\left[a+\\left(i-1\\right)\\Delta x,a+i\\Delta x\\right]\\) (\\(i=1,2,...,n\\)).</li><li>\\(a=\\lim_{\\Delta x\\ \\rightarrow\\ 0}c_1=\\lim_{n\\ \\rightarrow\\ \\infty}c_1\\) and \\(b=c_n\\).</li></ul><p>Thus the integral to which the Riemann sum converges is equal to</p><p>\\(\\int_0^1\\ln\\left(5 +3 x\\right)dx\\).</p>",
+		"feedback_wrong": "<p>In general, for tags&nbsp;\\(c_i\\) that are points in subintervals of equal size:</p><p>\\(\\sum_{i=1}^{n}f\\left(c_{i}\\right)\\cdot\\Delta x\\ \\rightarrow\\ \\int_{a}^{b}f\\left(x\\right)\\,dx\\)<strong>&nbsp;</strong>if&nbsp;\\(\\Delta x\\ \\rightarrow\\ 0\\) (refine the partition).&nbsp;</p>",
+		"name": "Exercise #63606",
+		"settings": {
+			"max_attempts": 2,
+			"attempt_settings": {
+				"1": {
+					"percentage_of_full_points": 100
+				},
+				"2": {
+					"percentage_of_full_points": 50
+				}
+			},
+			"feedback_at_incorrect_end_state": "correct_answer_and_detailed_solution"
+		},
+		"lock_answer_order": false,
+		"style": "open",
+		"type": "equation",
+		"challenge_set_main_id": null,
+		"mode": null,
+		"correct_challenge_transition_id": null,
+		"incorrect_challenge_transition_id": null,
+		"assignment": "",
+		"introduction": "",
+		"has_transition_logic": false,
+		"has_template": true,
+		"answer_field_settings": [],
+		"c_hash": "8",
+		"sub_challenges": [
+			{
+				"id": 63607,
+				"question": "<p>Determine&nbsp;\\(a,\\ b\\) and&nbsp;\\(f\\left(x\\right)\\) in this setting.</p>",
+				"description": "<p>Take as tags&nbsp;\\(c_i=5 +i\\cdot\\Delta x\\) with&nbsp;\\(\\Delta x=\\frac{3 }{n}\\) and&nbsp;\\(i\\ =\\ 1,2,...,n\\).</p>",
+				"answer_input_template": "<p>\\(a=\\)<answer-field ref=\"student.answer2\" class=\"inline-grow\"/></p><p>\\(b=\\)<answer-field ref=\"student.answer2.1\" class=\"inline-grow\"/></p><p>\\(f\\left(x\\right)=\\)<answer-field ref=\"student.answer2.2\" class=\"inline-grow\"/></p>",
+				"correct_answer": null,
+				"check_type": null,
+				"feedback": "<p>In general, for tags that are points in subintervals of equal size:</p><p>\\(\\sum_{i=1}^{n}f\\left(c_{i}\\right)\\cdot\\Delta x\\ \\rightarrow\\ \\int_{a}^{b}f\\left(x\\right)\\,dx\\)<strong>&nbsp;</strong>if&nbsp;\\(\\Delta x\\ \\rightarrow\\ 0\\) (refine the partition).<br>&nbsp;</p><p>Then:</p><ul><li>\\(\\Delta x=\\frac{b-a}{n}\\)&nbsp;(so&nbsp;\\(\\Delta x\\ \\rightarrow\\ 0\\) comes down to \\(n\\ \\rightarrow\\ \\infty\\)). Partition:&nbsp;\\(\\left[a,b\\right]\\) is divided in&nbsp;\\(n\\) subintervals of the same length.</li><li>\\(c_i\\in\\left[a+\\left(i-1\\right)\\Delta x,a+i\\Delta x\\right]\\) (\\(i=1,2,...,n\\)).</li><li>\\(a=\\lim_{\\Delta x\\ \\rightarrow\\ 0}c_1=\\lim_{n\\ \\rightarrow\\ \\infty}c_1\\) and \\(b=c_n\\).</li></ul><p>Thus the integral to which the Riemann sum converges is equal to</p><p>\\(\\int_{5 }^{8 }\\frac{1}{3 }\\ln\\left(x\\right)dx\\).</p>",
+				"feedback_wrong": "<p>In general, for tags&nbsp;\\(c_i\\) that are points in subintervals of equal size:</p><p>\\(\\sum_{i=1}^{n}f\\left(c_{i}\\right)\\cdot\\Delta x\\ \\rightarrow\\ \\int_{a}^{b}f\\left(x\\right)\\,dx\\)<strong>&nbsp;</strong>if&nbsp;\\(\\Delta x\\ \\rightarrow\\ 0\\) (refine the partition).&nbsp;</p>",
+				"name": "",
+				"settings": {
+					"max_attempts": 2,
+					"attempt_settings": {
+						"1": {
+							"percentage_of_full_points": 100
+						},
+						"2": {
+							"percentage_of_full_points": 50
+						}
+					},
+					"feedback_at_incorrect_end_state": "correct_answer_and_detailed_solution"
+				},
+				"lock_answer_order": false,
+				"style": "open",
+				"type": "equation",
+				"challenge_set_main_id": 63606,
+				"mode": null,
+				"correct_challenge_transition_id": null,
+				"incorrect_challenge_transition_id": null,
+				"assignment": "",
+				"introduction": "",
+				"has_transition_logic": false,
+				"has_template": false,
+				"multi_answer_settings": {},
+				"answer_field_settings": [],
+				"sub_challenges": [],
+				"answers": []
+			},
+			{
+				"id": 63608,
+				"question": "<p>How are the tags&nbsp;\\(c_i\\) chosen in both cases?</p>",
+				"description": "",
+				"answer_input_template": "",
+				"correct_answer": null,
+				"check_type": null,
+				"feedback": "",
+				"feedback_wrong": "",
+				"name": "",
+				"settings": {
+					"max_attempts": 2,
+					"attempt_settings": {
+						"1": {
+							"percentage_of_full_points": 100
+						}
+					},
+					"feedback_at_incorrect_end_state": "correct_answer_and_detailed_solution"
+				},
+				"lock_answer_order": false,
+				"style": "mc",
+				"type": null,
+				"challenge_set_main_id": 63606,
+				"mode": null,
+				"correct_challenge_transition_id": null,
+				"incorrect_challenge_transition_id": null,
+				"assignment": "",
+				"introduction": "",
+				"has_transition_logic": false,
+				"has_template": false,
+				"multi_answer_settings": {
+					"enabled": false
+				},
+				"answer_field_settings": [],
+				"sub_challenges": [],
+				"answers": [
+					{
+						"id": 117137,
+						"answer": "<p>As the left boundary points of the subintervals.</p>",
+						"response": "<p>Consider the first interval, where \\(i=1\\). Is the point&nbsp;\\(c_1\\) on the left or the right most point of the interval?</p>",
+						"right_answer": 0,
+						"feedback": null
+					},
+					{
+						"id": 117138,
+						"answer": "<p>As the right boundary points of the subintervals.</p>",
+						"response": "<p>In general, for tags that are the right boundary points of subintervals of equal size:</p><p>\\(\\sum_{i=1}^{n}f\\left(c_{i}\\right)\\cdot\\Delta x\\ \\rightarrow\\ \\int_{a}^{b}f\\left(x\\right)\\,dx\\)<strong>&nbsp;</strong>if&nbsp;\\(\\Delta x\\ \\rightarrow\\ 0\\)&nbsp;(refine the partition).<br>&nbsp;</p><p>Then:</p><ul><li>\\(\\Delta x=\\frac{b-a}{n}\\)&nbsp;(so&nbsp;\\(\\Delta x\\ \\rightarrow\\ 0\\)&nbsp;comes down to \\(n\\ \\rightarrow\\ \\infty\\)). Partition: \\(\\left[a,b\\right]\\)&nbsp;is divided in \\(n\\)&nbsp;subintervals of the same length.</li><li>\\(c_i=a+i\\Delta x\\)&nbsp;(\\(i=1,2,...,n\\)). Right boundary points.</li><li>\\(a=\\lim_{\\Delta x\\ \\rightarrow\\ 0}c_1=\\lim_{n\\ \\rightarrow\\ \\infty}c_1\\) and&nbsp;\\(b=c_n\\).</li></ul>",
+						"right_answer": 1,
+						"feedback": null
+					}
+				]
+			}
+		],
+		"answers": [],
+		"placeholder_data": [],
+		"download_data": []
+	}
+}
