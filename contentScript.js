@@ -268,6 +268,7 @@
           if (el.matches && el.matches('div.exercise-header-wrapper.d-flex.justify-content-between')) return true;
           if (el.matches && el.matches('p.fs-7.fst-italic')) return true;
           if (el.matches && el.matches('grapp-question-answer-field')) return true;
+          if (el.matches && el.matches('button[data-testid="next-button"]')) return true;
         } catch (e) {}
         return false;
       }
