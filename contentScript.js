@@ -219,7 +219,7 @@
   }
 
   function createAskGeminiButton() {
-    const urlTemplate = 'https://aistudio.google.com/prompts/new_chat?model=gemini-2.5-pro&prompt={prompt}';
+    const urlTemplate = 'https://aistudio.google.com/prompts/new_chat?model=gemini-3-flash-preview&prompt={prompt}';
     return createAIHelperButton('Gemini', 'ask-gemini-button', urlTemplate);
   }
 
