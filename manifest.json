@@ -19,11 +19,6 @@
     {
       "matches": ["https://app.grasple.com/*"],
       "js": ["contentScript.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://brightspace.tudelft.nl/*"],
-      "js": ["contentScript.js"],
       "run_at": "document_idle",
       "all_frames": true
     }

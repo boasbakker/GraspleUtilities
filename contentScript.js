@@ -116,7 +116,9 @@
    * @returns {boolean} True if we should initialize the extension in this context
    */
   function shouldRunInThisContext() {
-    return window.location.hostname === 'app.grasple.com';
+    const hostname = window.location.hostname;
+    // Match app.grasple.com or any subdomain of grasple.com
+    return hostname === 'app.grasple.com' || hostname.endsWith('.grasple.com');
   }
 
   if (!shouldRunInThisContext()) {
@@ -124,7 +126,8 @@
     return;
   }
 
-  console.log("Grasple Tools: Initializing in context:", window.self === window.top ? "main page" : "iframe");
+  const isInIframe = window.self !== window.top;
+  console.log("Grasple Tools: Initializing in context:", isInIframe ? "iframe (embedded)" : "main page");
 
 
   function createCopyButton() {
