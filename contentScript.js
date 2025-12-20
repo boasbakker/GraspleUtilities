@@ -108,8 +108,13 @@
   // A unique ID for the button container to prevent re-injection.
   const BUTTON_CONTAINER_ID = 'grasple-tools-button-container'; // <-- NEW
 
-  // Check if we should run in this context
-  // We should run if we're on app.grasple.com (either directly or in an iframe)
+  /**
+   * Check if we should run in this context.
+   * The extension should only run on app.grasple.com pages, either when:
+   * - Visiting app.grasple.com directly, OR
+   * - Inside an iframe embedded on another domain (e.g., Brightspace)
+   * @returns {boolean} True if we should initialize the extension in this context
+   */
   function shouldRunInThisContext() {
     return window.location.hostname === 'app.grasple.com';
   }
