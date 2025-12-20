@@ -11,7 +11,8 @@
 
   // Default configuration values
   const DEFAULT_CONFIG = {
-    stripDecorative: false
+    stripDecorative: false,
+    aiPrompt: ''
   };
 
   /**
@@ -175,8 +176,17 @@
       try {
         const result = await extractQuestionText();
         if (result.status === 'success' && result.text) {
-          // URL encode the question text
-          const encodedQuestion = encodeURIComponent(result.text);
+          // Get the custom AI prompt from settings
+          const aiPrompt = await configGet('aiPrompt');
+          
+          // Combine custom prompt with question text
+          let fullPrompt = result.text;
+          if (aiPrompt && aiPrompt.trim()) {
+            fullPrompt = aiPrompt.trim() + '\n\n' + result.text;
+          }
+          
+          // URL encode the full prompt
+          const encodedQuestion = encodeURIComponent(fullPrompt);
           // Construct the final URL from the template
           const finalUrl = urlTemplate.replace('{prompt}', encodedQuestion);
           

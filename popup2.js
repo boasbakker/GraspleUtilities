@@ -11,7 +11,8 @@
 
   // Default configuration values
   const DEFAULT_CONFIG = {
-    stripDecorative: false
+    stripDecorative: false,
+    aiPrompt: ''
   };
 
   /**
@@ -105,11 +106,12 @@
   }
 
   const stripDecorativeCheckbox = document.getElementById('stripDecorative');
+  const aiPromptTextarea = document.getElementById('aiPrompt');
 
   // Load saved settings on popup open
   async function loadSettings() {
     console.log('Loading settings...');
-    const config = await configGet({ stripDecorative: false });
+    const config = await configGet({ stripDecorative: false, aiPrompt: '' });
     console.log('Loaded config:', config);
     if (stripDecorativeCheckbox) {
       stripDecorativeCheckbox.checked = config.stripDecorative;
@@ -117,14 +119,23 @@
     } else {
       console.error('Checkbox element not found!');
     }
+    if (aiPromptTextarea) {
+      aiPromptTextarea.value = config.aiPrompt || '';
+      console.log('AI prompt set to:', config.aiPrompt);
+    } else {
+      console.error('AI prompt textarea element not found!');
+    }
   }
 
   // Save settings when checkbox changes
   async function saveSettings() {
-    const value = stripDecorativeCheckbox.checked;
-    console.log('Saving stripDecorative:', value);
+    const stripDecorativeValue = stripDecorativeCheckbox.checked;
+    const aiPromptValue = aiPromptTextarea ? aiPromptTextarea.value : '';
+    console.log('Saving stripDecorative:', stripDecorativeValue);
+    console.log('Saving aiPrompt:', aiPromptValue);
     await configSet({
-      stripDecorative: value
+      stripDecorative: stripDecorativeValue,
+      aiPrompt: aiPromptValue
     });
     console.log('Settings saved successfully');
   }
@@ -144,9 +155,21 @@
     // Save settings when checkbox changes
     if (stripDecorativeCheckbox) {
       stripDecorativeCheckbox.addEventListener('change', saveSettings);
-      console.log('Event listener attached');
+      console.log('Event listener attached to checkbox');
     } else {
       console.error('Could not attach event listener - checkbox not found');
+    }
+
+    // Save settings when AI prompt changes (with debounce)
+    if (aiPromptTextarea) {
+      let timeoutId;
+      aiPromptTextarea.addEventListener('input', () => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(saveSettings, 500); // Save after 500ms of no typing
+      });
+      console.log('Event listener attached to AI prompt textarea');
+    } else {
+      console.error('Could not attach event listener - AI prompt textarea not found');
     }
   }
 
