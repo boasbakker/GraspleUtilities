@@ -9,12 +9,10 @@ The extension should work on any modern browser, both Chromium-based (Google Chr
 - Copy question, including $\LaTeX$ to clipboard
 - Copy question and ask it to an AI (ChatGPT or Gemini 2.5 Pro)
 - Enable/disable copying of decorative LaTeX
-- **Works on embedded Grasple pages** in Learning Management Systems like Brightspace
 
-## Supported Platforms
-
+**Supported Platforms**
 The extension works on:
 - Direct Grasple pages at `app.grasple.com`
 - Embedded Grasple exercises on `brightspace.tudelft.nl`
-- Can be extended to support other LMS platforms where Grasple is embedded
+- Can be extended to support other platforms where Grasple is embedded
 
