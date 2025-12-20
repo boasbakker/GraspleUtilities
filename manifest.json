@@ -9,7 +9,8 @@
     "webRequest"
   ],
   "host_permissions": [
-    "https://app.grasple.com/*"
+    "https://app.grasple.com/*",
+    "https://brightspace.tudelft.nl/*"
   ],
   "background": {
     "scripts": ["background.js"]
@@ -19,6 +20,12 @@
       "matches": ["https://app.grasple.com/*"],
       "js": ["contentScript.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://brightspace.tudelft.nl/*"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "action": {
