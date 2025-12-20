@@ -108,7 +108,18 @@
   // A unique ID for the button container to prevent re-injection.
   const BUTTON_CONTAINER_ID = 'grasple-tools-button-container'; // <-- NEW
 
-  console.log("Grasple Tools: Initializing...");
+  // Check if we should run in this context
+  // We should run if we're on app.grasple.com (either directly or in an iframe)
+  function shouldRunInThisContext() {
+    return window.location.hostname === 'app.grasple.com';
+  }
+
+  if (!shouldRunInThisContext()) {
+    console.log("Grasple Tools: Not running in this context (hostname:", window.location.hostname, ")");
+    return;
+  }
+
+  console.log("Grasple Tools: Initializing in context:", window.self === window.top ? "main page" : "iframe");
 
 
   function createCopyButton() {
