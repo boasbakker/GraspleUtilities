@@ -282,11 +282,11 @@
       function isIgnoredElement(el) {
         if (!(el instanceof Element)) return false;
         const tag = el.tagName ? el.tagName.toLowerCase() : '';
-        if (tag === 'grapp-question-answer-input-template') return true;
+        // if (tag === 'grapp-question-answer-input-template') return true;
         try {
           if (el.matches && el.matches('div.exercise-header-wrapper.d-flex.justify-content-between')) return true;
           if (el.matches && el.matches('p.fs-7.fst-italic')) return true;
-          if (el.matches && el.matches('grapp-question-answer-field')) return true;
+          // if (el.matches && el.matches('grapp-question-answer-field')) return true;
           if (el.matches && el.matches('button[data-testid="next-button"]')) return true;
         } catch (e) {}
         return false;
@@ -331,7 +331,73 @@
           'p', 'li', 'div', 'tr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'blockquote'
       ]);
 
-      function traverse(node) {
+      let __mathExtractorCounter = 0;
+
+      async function getMathFieldValuesInElement(container) {
+        if (!(container instanceof Element)) return [];
+        const MSG_SOURCE = '__ext_mathlive_extractor_v1';
+        const id = 'math-extractor-' + (++__mathExtractorCounter);
+        container.setAttribute('data-math-extractor-id', id);
+
+        return new Promise((resolve) => {
+          let resolved = false;
+          function onMessage(evt) {
+            if (evt.source !== window || !evt.data || evt.data.source !== MSG_SOURCE || evt.data.id !== id) return;
+            resolved = true;
+            window.removeEventListener('message', onMessage);
+            try {
+              const values = Array.isArray(evt.data.values) ? evt.data.values : [];
+              resolve(values);
+            } catch (e) {
+              resolve([]);
+            } finally {
+              try { container.removeAttribute('data-math-extractor-id'); } catch (e) { }
+            }
+          }
+          window.addEventListener('message', onMessage);
+
+          // inject page script to read math-field values inside this container
+          const script = document.createElement('script');
+          script.type = 'text/javascript';
+          script.textContent = `(${function (MSG_SOURCE, id) {
+            try {
+              const container = document.querySelector('[data-math-extractor-id="' + id + '"]');
+              const values = [];
+              if (container) {
+                const mfs = Array.from(container.querySelectorAll('math-field'));
+                mfs.forEach(mf => {
+                  try {
+                    if (typeof mf.getValue === 'function') {
+                      try { values.push(mf.getValue('latex')); } catch (e) { values.push(mf.getValue()); }
+                      return;
+                    }
+                    if ('value' in mf && mf.value) { values.push(mf.value); return; }
+                    const attr = mf.getAttribute && mf.getAttribute('value');
+                    if (attr) { values.push(attr); return; }
+                    if (mf.textContent) { values.push(mf.textContent); return; }
+                  } catch (innerE) { }
+                });
+              }
+              window.postMessage({ source: MSG_SOURCE, id: id, values: values }, '*');
+            } catch (err) {
+              window.postMessage({ source: MSG_SOURCE, id: id, error: String(err) }, '*');
+            }
+          }})(` + JSON.stringify(MSG_SOURCE) + ',' + JSON.stringify(id) + `);`;
+          (document.head || document.documentElement).appendChild(script);
+          // remove script node immediately to keep DOM clean
+          script.parentNode && script.parentNode.removeChild(script);
+
+          // timeout to avoid blocking too long
+          setTimeout(() => {
+            if (resolved) return;
+            window.removeEventListener('message', onMessage);
+            try { container.removeAttribute('data-math-extractor-id'); } catch (e) { }
+            resolve([]);
+          }, 500);
+        });
+      }
+
+      async function traverse(node) {
         if (!node) return;
 
         if (node.nodeType === Node.TEXT_NODE) {
@@ -348,6 +414,28 @@
           if (!isElementVisible(el) || isIgnoredElement(el)) return;
 
           const tagName = el.tagName ? el.tagName.toLowerCase() : '';
+
+          // Special handling: capture user-entered LaTeX inside math-field elements (answer inputs)
+          if (tagName === 'grapp-question-answer-input-template' || tagName === 'grapp-question-answer-field') {
+            try {
+              const values = await getMathFieldValuesInElement(el);
+              const cleaned = (Array.isArray(values) ? values : [])
+                .map(v => (v == null ? '' : String(v)))
+                .map(v => v.replace(/\s+/g, ' ').trim())
+                .filter(Boolean);
+
+              if (cleaned.length > 0) {
+                const combined = cleaned.map(v => '$' + v + '$').join(' , ');
+                pushRaw('\n');
+                pushRaw('My answer: ' + combined);
+              } else {
+                // no values found inside this input, do nothing
+              }
+            } catch (e) {
+              console.log('Error extracting math-field values:', e);
+            }
+            return; // don't traverse into these input/template nodes further
+          }
 
           // Handle major breaks for new sub-questions
           if (tagName === 'grapp-question-header') {
@@ -406,14 +494,16 @@
             return;
           }
 
-          for (let child = el.firstChild; child; child = child.nextSibling) traverse(child);
+          for (let child = el.firstChild; child; child = child.nextSibling) {
+            await traverse(child);
+          }
         }
       }
 
       const root = document.querySelector('div.position-relative.exercise-wrapper');
       if (!root) return { status: 'no-target', message: 'No .exercise-wrapper found' };
 
-      traverse(root);
+      await traverse(root);
 
       // Assemble the final text from pieces
       let finalText = '';
