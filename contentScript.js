@@ -1224,38 +1224,44 @@
   // =========================================================================
 
   async function runAnswerCheckInjection() {
-    // Check if explanation buttons are enabled
-    const config = await configGet({ showExplanationButtons: true });
-    if (!config.showExplanationButtons) {
-      console.log('Grasple Tools: Explanation buttons disabled in settings');
+    // Check settings
+    const config = await configGet({ showExplanationButtons: true, showAnswerButtons: true });
+    const showExplanation = config.showExplanationButtons !== false;
+    const showAnswer = config.showAnswerButtons !== false;
+
+    // If both are disabled, nothing to do
+    if (!showExplanation && !showAnswer) {
+      console.log('Grasple Tools: Both explanation and answer buttons disabled');
       return;
     }
 
-    // 1. Find existing "Check" buttons
-    let checkBtns = Array.from(document.querySelectorAll('button[data-testid="check-answer-button"]'));
+    // 1. Find existing "Check" buttons - inject explanation button if enabled
+    if (showExplanation) {
+      let checkBtns = Array.from(document.querySelectorAll('button[data-testid="check-answer-button"]'));
 
-    // Fallback: check for text if testid not found
-    if (checkBtns.length === 0) {
-      const allButtons = Array.from(document.querySelectorAll('button, div[role="button"], a.btn'));
-      checkBtns = allButtons.filter(b => {
-        const txt = b.textContent.trim().toLowerCase();
-        return (txt.includes('check') || txt.includes('controleer'));
+      // Fallback: check for text if testid not found
+      if (checkBtns.length === 0) {
+        const allButtons = Array.from(document.querySelectorAll('button, div[role="button"], a.btn'));
+        checkBtns = allButtons.filter(b => {
+          const txt = b.textContent.trim().toLowerCase();
+          return (txt.includes('check') || txt.includes('controleer'));
+        });
+      }
+
+      checkBtns.forEach(originalCheckBtn => {
+        if (originalCheckBtn.hasAttribute('data-grasple-tools-processed')) return;
+
+        console.log('Grasple Tools: Found Check button. Injecting View Explanation...');
+
+        originalCheckBtn.setAttribute('data-grasple-tools-processed', 'true');
+
+        const explainBtn = createExplanationButton(originalCheckBtn.className);
+
+        // Insert before original
+        const parent = originalCheckBtn.parentNode;
+        parent.insertBefore(explainBtn, originalCheckBtn);
       });
     }
-
-    checkBtns.forEach(originalCheckBtn => {
-      if (originalCheckBtn.hasAttribute('data-grasple-tools-processed')) return;
-
-      console.log('Grasple Tools: Found Check button. Injecting View Explanation...');
-
-      originalCheckBtn.setAttribute('data-grasple-tools-processed', 'true');
-
-      const explainBtn = createExplanationButton(originalCheckBtn.className);
-
-      // Insert before original
-      const parent = originalCheckBtn.parentNode;
-      parent.insertBefore(explainBtn, originalCheckBtn);
-    });
 
     // 2. Handle multiple choice questions (no Check button)
     // Look for grapp-multiple-choice elements that don't have our button yet
@@ -1267,13 +1273,11 @@
 
       // Check if there's already a check button inside (then it's handled above)
       if (mcContainer.querySelector('button[data-testid="check-answer-button"]')) return;
-      if (mcContainer.querySelector('.grasple-safe-check-btn')) return;
+      if (mcContainer.querySelector('.grasple-safe-check-btn') || mcContainer.querySelector('.grasple-show-answer-btn')) return;
 
-      console.log('Grasple Tools: Found multiple choice container. Injecting View Explanation...');
+      console.log('Grasple Tools: Found multiple choice container. Injecting buttons...');
 
       mcContainer.setAttribute('data-grasple-mc-processed', 'true');
-
-      const explainBtn = createExplanationButton('btn btn-warning');
 
       // Find a good place to insert - after the instruction text or at the end
       const instructionEl = mcContainer.querySelector('grapp-multiple-choice-answer-instruction');
@@ -1283,11 +1287,19 @@
       const wrapper = document.createElement('div');
       wrapper.style.marginTop = '10px';
       wrapper.style.padding = '10px 0';
-      wrapper.appendChild(explainBtn);
+      wrapper.classList.add('grasple-tools-button-wrapper');
 
-      // Also add a "Show Answer" button for MCQs
-      const answerBtn = createShowAnswerButton('btn btn-success');
-      wrapper.appendChild(answerBtn);
+      // Add explanation button if enabled
+      if (showExplanation) {
+        const explainBtn = createExplanationButton('btn btn-warning');
+        wrapper.appendChild(explainBtn);
+      }
+
+      // Add "Show Answer" button if enabled
+      if (showAnswer) {
+        const answerBtn = createShowAnswerButton('btn btn-success');
+        wrapper.appendChild(answerBtn);
+      }
 
       // Insert after instruction element, or after fieldset, or at end of container
       if (instructionEl) {
@@ -1443,18 +1455,29 @@
     const allSafeBtns = Array.from(document.querySelectorAll('.grasple-safe-check-btn'));
     const btnIndex = allSafeBtns.indexOf(btn);
 
-    // Identify Scope/Container
-    const container = btn.closest('grapp-challenge') ||
-      btn.closest('.challenge-container') ||
-      btn.closest('.card') ||
-      btn.closest('.exercise-wrapper') ||
-      btn.closest('.col-12') ||
+    // Find the question wrapper - this is the unique container per question
+    // Structure: grapp-question.question-wrapper contains grapp-multiple-choice-* or grapp-question-answer-field
+    const questionWrapper = btn.closest('grapp-question.question-wrapper') ||
+      btn.closest('grapp-question');
+
+    // The answer field or MCQ container (for insertion at end)
+    const answerContainer = btn.closest('grapp-multiple-choice-single-answer') ||
+      btn.closest('grapp-multiple-choice-multiple-answers') ||
+      btn.closest('grapp-multiple-choice') ||
+      btn.closest('grapp-question-answer-field');
+
+    // Fallback container
+    const container = questionWrapper || answerContainer ||
+      btn.closest('grapp-challenge') ||
       document.body;
 
     let challengeInfo = null;
 
-    // Strategy 0: Fieldset ID Match (most reliable for sub-questions)
-    const fieldset = container.querySelector('fieldset[id^="question-answer-input-"]');
+    // Use questionWrapper for ID lookup (it contains the question ID text)
+    const searchRoot = questionWrapper || answerContainer || container;
+
+    // Strategy 0: Fieldset ID Match (most reliable for sub-questions/MCQs)
+    const fieldset = searchRoot.querySelector('fieldset[id^="question-answer-input-"]');
     if (fieldset && fieldset.id) {
       const match = fieldset.id.match(/question-answer-input-(\d+)/);
       if (match) {
@@ -1462,6 +1485,27 @@
         if (challengesMap[fieldsetId]) {
           console.log('Grasple Tools: Matched via Fieldset ID:', fieldsetId);
           challengeInfo = challengesMap[fieldsetId];
+        }
+      }
+    }
+
+    // Strategy 0.5: Input/Form element ID Match for regular questions
+    if (!challengeInfo) {
+      // Look for math-field, input elements with challenge ID patterns
+      const inputEl = searchRoot.querySelector('[id*="challenge-"][id*="-input"]') ||
+        searchRoot.querySelector('math-field[id]') ||
+        searchRoot.querySelector('input[name*="answer"]');
+      if (inputEl && inputEl.id) {
+        // Try to extract challenge ID from input ID pattern
+        const idMatch = inputEl.id.match(/challenge[_-]?(\d+)/i) ||
+          inputEl.id.match(/question[_-]?(\d+)/i) ||
+          inputEl.id.match(/(\d{4,})/); // Match 4+ digit IDs
+        if (idMatch) {
+          const inputChallengeId = parseInt(idMatch[1], 10);
+          if (challengesMap[inputChallengeId]) {
+            console.log('Grasple Tools: Matched via Input ID:', inputChallengeId);
+            challengeInfo = challengesMap[inputChallengeId];
+          }
         }
       }
     }
@@ -1476,7 +1520,7 @@
     }
 
     if (!challengeInfo) {
-      const visualId = findIdInElement(container);
+      const visualId = findIdInElement(searchRoot); // Use searchRoot instead of container
       if (visualId && challengesMap[visualId]) {
         console.log('Grasple Tools: Matched via Visual ID:', visualId);
         challengeInfo = challengesMap[visualId];
@@ -1535,10 +1579,11 @@
 
     // --- Rich Rendering Logic ---
 
-    // Check if we already injected feedback for this specific container
-    let feedbackEl = container.querySelector('.grasple-tools-injected-feedback');
+    // Check if we already injected feedback in this answerContainer - remove to refresh
+    let feedbackEl = answerContainer?.querySelector('.grasple-tools-injected-feedback') ||
+      container.querySelector('.grasple-tools-injected-feedback');
     if (feedbackEl) {
-      feedbackEl.remove(); // Toggle off if clicked again? Or just refresh it. Let's refresh.
+      feedbackEl.remove();
     }
 
     // Create the structure mimicking <grapp-question-feedback>
@@ -1568,15 +1613,11 @@
       </grapp-question-feedback>
     `;
 
-    // Insert into container. Best place is usually at the bottom of the challenge body or after the question text.
-    // Try to find the footer or button container
-    const footer = container.querySelector('.exercise-footer') ||
-      container.querySelector('.card-footer') ||
-      container.querySelector('.exercise-question');
-
-    if (footer) {
-      footer.appendChild(feedbackWrapper);
-    } else {
+    // Insert as last child of answerContainer (for proper width)
+    // answerContainer is grapp-multiple-choice-* or grapp-question-answer-field
+    if (answerContainer) {
+      answerContainer.appendChild(feedbackWrapper);
+    } else if (container) {
       container.appendChild(feedbackWrapper);
     }
 
@@ -1638,16 +1679,21 @@
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (node.nodeType === 1) { // Element node
-          // Check if native feedback was added
-          const nativeFeedback = node.matches && node.matches('grapp-question-feedback, [data-testid="question-feedback"]')
+          // Check if native feedback was added (grapp-question-feedback or section with question-feedback class)
+          const nativeFeedback = node.matches && node.matches('grapp-question-feedback, [data-testid="question-feedback"], .question-feedback')
             ? node
-            : node.querySelector && node.querySelector('grapp-question-feedback, [data-testid="question-feedback"]');
+            : node.querySelector && node.querySelector('grapp-question-feedback, [data-testid="question-feedback"], .question-feedback');
 
           if (nativeFeedback) {
-            // Find the parent challenge container
-            const container = nativeFeedback.closest('grapp-challenge') ||
-              nativeFeedback.closest('.challenge-container') ||
-              nativeFeedback.closest('.card');
+            // Find the parent question wrapper
+            const questionWrapper = nativeFeedback.closest('grapp-question.question-wrapper') ||
+              nativeFeedback.closest('grapp-question');
+            const answerContainer = nativeFeedback.closest('grapp-multiple-choice-single-answer') ||
+              nativeFeedback.closest('grapp-multiple-choice-multiple-answers') ||
+              nativeFeedback.closest('grapp-multiple-choice') ||
+              nativeFeedback.closest('grapp-question-answer-field');
+
+            const container = questionWrapper || answerContainer;
 
             if (container) {
               // Hide our injected explanation in this container
