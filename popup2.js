@@ -1,7 +1,7 @@
 // popup2.js - Settings page for Grasple Utilities
 // Handles persistent storage of user preferences
 
-(function() {
+(function () {
   'use strict';
 
   // Cross-browser compatibility
@@ -12,13 +12,13 @@
   // Default configuration values
   const DEFAULT_CONFIG = {
     stripDecorative: false,
-    aiPrompt: ''
+    aiPrompt: '',
+    showExplanationButtons: true,
+    showAnswerButtons: true
   };
 
   /**
    * Get configuration value(s) from storage
-   * @param {string|object} keys - Single key (string) or object with default values
-   * @returns {Promise<any>} Configuration value(s)
    */
   async function configGet(keys) {
     try {
@@ -27,24 +27,20 @@
         return typeof keys === 'string' ? DEFAULT_CONFIG[keys] : keys;
       }
 
-      // Try sync first, fallback to local
       const storage = api.storage.sync || api.storage.local;
       if (!storage) {
         console.warn('No storage backend available');
         return typeof keys === 'string' ? DEFAULT_CONFIG[keys] : keys;
       }
 
-      // Normalize keys to object format
-      const keysObj = typeof keys === 'string' 
-        ? { [keys]: DEFAULT_CONFIG[keys] } 
+      const keysObj = typeof keys === 'string'
+        ? { [keys]: DEFAULT_CONFIG[keys] }
         : { ...DEFAULT_CONFIG, ...keys };
 
       if (hasBrowser) {
-        // Firefox
         const result = await storage.get(keysObj);
         return typeof keys === 'string' ? result[keys] : result;
       } else if (hasChrome) {
-        // Chrome
         return new Promise((resolve) => {
           storage.get(keysObj, (result) => {
             if (api.runtime && api.runtime.lastError) {
@@ -65,8 +61,6 @@
 
   /**
    * Set configuration value(s) in storage
-   * @param {object} config - Configuration object to save
-   * @returns {Promise<void>}
    */
   async function configSet(config) {
     try {
@@ -75,7 +69,6 @@
         return;
       }
 
-      // Try sync first, fallback to local
       const storage = api.storage.sync || api.storage.local;
       if (!storage) {
         console.warn('No storage backend available');
@@ -83,11 +76,9 @@
       }
 
       if (hasBrowser) {
-        // Firefox
         await storage.set(config);
         console.log('Config saved:', config);
       } else if (hasChrome) {
-        // Chrome
         return new Promise((resolve) => {
           storage.set(config, () => {
             if (api.runtime && api.runtime.lastError) {
@@ -105,38 +96,72 @@
     }
   }
 
+  /**
+   * Send message to content script to update buttons
+   */
+  async function notifyContentScript() {
+    try {
+      const tabs = await (hasBrowser ? browser.tabs.query({ active: true, currentWindow: true }) :
+        new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, resolve)));
+
+      if (tabs && tabs[0]) {
+        const message = {
+          type: 'GRASPLE_SETTINGS_CHANGED',
+          showExplanationButtons: showExplanationButtonsCheckbox?.checked ?? true,
+          showAnswerButtons: showAnswerButtonsCheckbox?.checked ?? true
+        };
+
+        if (hasBrowser) {
+          browser.tabs.sendMessage(tabs[0].id, message);
+        } else {
+          chrome.tabs.sendMessage(tabs[0].id, message);
+        }
+        console.log('Notified content script of settings change');
+      }
+    } catch (err) {
+      console.log('Could not notify content script:', err);
+    }
+  }
+
   const stripDecorativeCheckbox = document.getElementById('stripDecorative');
   const aiPromptTextarea = document.getElementById('aiPrompt');
+  const showExplanationButtonsCheckbox = document.getElementById('showExplanationButtons');
+  const showAnswerButtonsCheckbox = document.getElementById('showAnswerButtons');
 
   // Load saved settings on popup open
   async function loadSettings() {
     console.log('Loading settings...');
-    const config = await configGet({ stripDecorative: false, aiPrompt: '' });
+    const config = await configGet(DEFAULT_CONFIG);
     console.log('Loaded config:', config);
+
     if (stripDecorativeCheckbox) {
       stripDecorativeCheckbox.checked = config.stripDecorative;
-      console.log('Checkbox set to:', config.stripDecorative);
-    } else {
-      console.error('Checkbox element not found!');
+    }
+    if (showExplanationButtonsCheckbox) {
+      showExplanationButtonsCheckbox.checked = config.showExplanationButtons !== false;
+    }
+    if (showAnswerButtonsCheckbox) {
+      showAnswerButtonsCheckbox.checked = config.showAnswerButtons !== false;
     }
     if (aiPromptTextarea) {
       aiPromptTextarea.value = config.aiPrompt || '';
-      console.log('AI prompt set to:', config.aiPrompt);
-    } else {
-      console.error('AI prompt textarea element not found!');
     }
   }
 
   // Save settings when checkbox changes
   async function saveSettings() {
-    const stripDecorativeValue = stripDecorativeCheckbox.checked;
-    const aiPromptValue = aiPromptTextarea ? aiPromptTextarea.value : '';
-    console.log('Saving stripDecorative:', stripDecorativeValue);
-    console.log('Saving aiPrompt:', aiPromptValue);
-    await configSet({
-      stripDecorative: stripDecorativeValue,
-      aiPrompt: aiPromptValue
-    });
+    const config = {
+      stripDecorative: stripDecorativeCheckbox?.checked ?? false,
+      aiPrompt: aiPromptTextarea?.value ?? '',
+      showExplanationButtons: showExplanationButtonsCheckbox?.checked ?? true,
+      showAnswerButtons: showAnswerButtonsCheckbox?.checked ?? true
+    };
+
+    await configSet(config);
+
+    // Notify content script to update buttons immediately
+    await notifyContentScript();
+
     console.log('Settings saved successfully');
   }
 
@@ -149,27 +174,24 @@
 
   function init() {
     console.log('Initializing popup...');
-    // Load settings when popup opens
     loadSettings();
 
-    // Save settings when checkbox changes
+    // Attach event listeners
     if (stripDecorativeCheckbox) {
       stripDecorativeCheckbox.addEventListener('change', saveSettings);
-      console.log('Event listener attached to checkbox');
-    } else {
-      console.error('Could not attach event listener - checkbox not found');
     }
-
-    // Save settings when AI prompt changes (with debounce)
+    if (showExplanationButtonsCheckbox) {
+      showExplanationButtonsCheckbox.addEventListener('change', saveSettings);
+    }
+    if (showAnswerButtonsCheckbox) {
+      showAnswerButtonsCheckbox.addEventListener('change', saveSettings);
+    }
     if (aiPromptTextarea) {
       let timeoutId;
       aiPromptTextarea.addEventListener('input', () => {
         clearTimeout(timeoutId);
-        timeoutId = setTimeout(saveSettings, 500); // Save after 500ms of no typing
+        timeoutId = setTimeout(saveSettings, 500);
       });
-      console.log('Event listener attached to AI prompt textarea');
-    } else {
-      console.error('Could not attach event listener - AI prompt textarea not found');
     }
   }
 

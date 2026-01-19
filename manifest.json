@@ -13,12 +13,18 @@
     "https://brightspace.tudelft.nl/*"
   ],
   "background": {
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
   "content_scripts": [
     {
-      "matches": ["https://app.grasple.com/*"],
-      "js": ["contentScript.js"],
+      "matches": [
+        "https://app.grasple.com/*"
+      ],
+      "js": [
+        "contentScript.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     }
@@ -27,6 +33,19 @@
     "default_title": "Copy exercise text and LaTeX",
     "default_popup": "popup.html"
   },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "node_modules/katex/dist/katex.min.css",
+        "node_modules/katex/dist/katex.min.js",
+        "node_modules/katex/dist/contrib/auto-render.min.js",
+        "node_modules/katex/dist/fonts/*"
+      ],
+      "matches": [
+        "https://app.grasple.com/*"
+      ]
+    }
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "temp@example.com"
