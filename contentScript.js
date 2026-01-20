@@ -82,6 +82,16 @@
                 window.postMessage({ type: 'GRASPLE_SESSION_DATA', payload: sessionData }, '*');
                } catch(e) {}
             }
+            
+            // Capture check-answer responses to get correct answers
+            if (this._url && this._url.match(/\\/check-answer/)) {
+               try {
+                const data = JSON.parse(this.responseText);
+                console.log('Grasple Tools: Captured check-answer response', data);
+                // Include URL so we can extract challenge ID
+                window.postMessage({ type: 'GRASPLE_CHECK_ANSWER_RESPONSE', payload: data, url: this._url }, '*');
+               } catch(e) { console.error('Grasple Tools: check-answer parse error', e); }
+            }
           });
           return send.apply(this, arguments);
         };
@@ -94,28 +104,45 @@
                     const options = {
                         delimiters: [
                             {left: "$$", right: "$$", display: true},
-                            {left: "$", right: "$", display: false},
-                            {left: "\\(", right: "\\)", display: false},
-                            {left: "\\[", right: "\\]", display: true},
-                            // Add double-escaped delimiters for robust matching
+                            // Only explicit LaTeX delimiters - no $ to avoid false positives
                             {left: "\\\\(", right: "\\\\)", display: false},
-                            {left: "\\\\[", right: "\\\\]", display: true}
+                            {left: "\\\\(", right: "\\)", display: false},
+                            {left: "\\(", right: "\\\\)", display: false},
+                            {left: "\\(", right: "\\)", display: false},
+                            // Block delimiters
+                            {left: "\\\\[", right: "\\\\]", display: true},
+                            {left: "\\\\[", right: "\\]", display: true},
+                            {left: "\\[", right: "\\\\]", display: true},
+                            {left: "\\[", right: "\\]", display: true}
                         ],
-                        throwOnError: false
+                        throwOnError: false,
+                        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"]
                     };
                     
-                    // Fix KaTeX background
+                    // Fix KaTeX background - ensure transparency so it inherits container color (yellow for explanation, blue for hint)
                     if (!document.getElementById('grasple-katex-fix')) {
                         const style = document.createElement('style');
                         style.id = 'grasple-katex-fix';
-                        style.textContent = '.grasple-tools-injected-feedback .question-feedback-wrapper { background-color: #f8f9fa !important; } .grasple-tools-injected-feedback .katex, .grasple-tools-injected-feedback .katex *, .grasple-tools-injected-feedback .user-provided-html span { background: none !important; background-color: transparent !important; }';
+                        style.textContent = 
+                          '.grasple-tools-injected-feedback .katex, ' + 
+                          '.grasple-tools-injected-feedback .katex *, ' + 
+                          '.grasple-tools-injected-feedback .user-provided-html span, ' +
+                          '.grasple-tools-injected-hint .katex, ' +
+                          '.grasple-tools-injected-hint .katex * { ' + 
+                          '  background: none !important; ' + 
+                          '  background-color: transparent !important; ' + 
+                          '} ' +
+                          '.grasple-tools-injected-feedback .katex-display { ' +
+                          '   margin: 0.5em 0 !important; ' +
+                          '}';
                         document.head.appendChild(style);
                     }
                     
+                    // Use Grasple's default render settings (no custom options)
                     if (window.renderMathInElement) {
-                        try { window.renderMathInElement(el, options); } catch(e) { console.error('Grasple Tools: renderMathInElement failed', e); }
+                        try { window.renderMathInElement(el); } catch(e) { console.error('Grasple Tools: renderMathInElement failed', e); }
                     } else if (window.katex && window.katex.renderMathInElement) {
-                        try { window.katex.renderMathInElement(el, options); } catch(e) { console.error('Grasple Tools: katex.render failed', e); }
+                        try { window.katex.renderMathInElement(el); } catch(e) { console.error('Grasple Tools: katex.render failed', e); }
                     } else if (window.MathJax) {
                         if (window.MathJax.typeset) {
                            try { window.MathJax.typeset([el]); } catch(e) { console.error('Grasple Tools: MathJax.typeset failed', e); }
@@ -143,6 +170,7 @@
   window.graspleChallengesList = []; // Ordered list
   window.graspleSessionData = null;
   window.graspleAuthToken = null;
+  window.graspleCorrectAnswers = {}; // Store correct answers by challenge ID for button injection
 
   window.addEventListener('message', (event) => {
     if (event.source !== window || !event.data) return;
@@ -186,6 +214,29 @@
     }
     if (event.data.type === 'GRASPLE_AUTH_TOKEN') {
       window.graspleAuthToken = event.data.token;
+    }
+    if (event.data.type === 'GRASPLE_CHECK_ANSWER_RESPONSE') {
+      const payload = event.data.payload;
+      const url = event.data.url;
+      console.log('Grasple Tools: Storing check-answer response', payload, 'URL:', url);
+
+      // Extract challenge ID from the URL: /challenges/XXXXX/check-answer
+      let challengeId = 'latest';
+      if (url) {
+        const match = url.match(/\/challenges\/(\d+)\/check-answer/);
+        if (match) {
+          challengeId = match[1];
+        }
+      }
+      console.log('Grasple Tools: Extracted challenge ID from URL:', challengeId);
+
+      // Store the correct answer for later button injection
+      if (payload.correct_answer) {
+        window.graspleCorrectAnswers[challengeId] = payload.correct_answer;
+        // Also store as 'latest' for fallback matching
+        window.graspleCorrectAnswers['latest'] = payload.correct_answer;
+        console.log('Grasple Tools: Stored correct answer for challenge', challengeId);
+      }
     }
   });
 
@@ -1251,15 +1302,127 @@
       checkBtns.forEach(originalCheckBtn => {
         if (originalCheckBtn.hasAttribute('data-grasple-tools-processed')) return;
 
-        console.log('Grasple Tools: Found Check button. Injecting View Explanation...');
+        console.log('Grasple Tools: Found Check button. Injecting View Explanation and Show Hint...');
 
         originalCheckBtn.setAttribute('data-grasple-tools-processed', 'true');
 
         const explainBtn = createExplanationButton(originalCheckBtn.className);
+        const hintBtn = createShowHintButton(originalCheckBtn.className);
 
-        // Insert before original
+        // Insert before original (hint first, then explanation)
         const parent = originalCheckBtn.parentNode;
+        parent.insertBefore(hintBtn, originalCheckBtn);
         parent.insertBefore(explainBtn, originalCheckBtn);
+
+        // Check if we have a stored correct answer for THIS specific challenge
+        // Find challenge ID by traversing up from the button to find the containing question
+        let challengeId = null;
+
+        // Walk up the DOM tree to find the nearest container with a question header
+        let currentEl = originalCheckBtn;
+        let header = null;
+        while (currentEl && currentEl !== document.body) {
+          currentEl = currentEl.parentElement;
+          if (currentEl) {
+            header = currentEl.querySelector('[id^="question-header-"]');
+            if (header) {
+              console.log('Grasple Tools DEBUG: Found header in ancestor:', currentEl.tagName, '→', header.id);
+              break;
+            }
+          }
+        }
+
+        if (header) {
+          const match = header.id.match(/question-header-(\d+)/);
+          if (match) challengeId = match[1];
+        }
+
+        // Strategy 2: Look for parent with id (fallback)
+        if (!challengeId) {
+          const challengeEl = originalCheckBtn.closest('[id^="challenge-"]');
+          console.log('Grasple Tools DEBUG: Fallback challenge element:', challengeEl?.id);
+          if (challengeEl) {
+            const match = challengeEl.getAttribute('id').match(/challenge-(\d+)/);
+            if (match) challengeId = match[1];
+          }
+        }
+
+        console.log('Grasple Tools DEBUG: Extracted challengeId:', challengeId);
+        console.log('Grasple Tools DEBUG: Stored answers:', JSON.stringify(Object.keys(window.graspleCorrectAnswers || {})));
+
+        // Fallback: use 'latest' if single question mode and no ID found
+
+        let storedAnswer = null;
+        if (challengeId && window.graspleCorrectAnswers && window.graspleCorrectAnswers[challengeId]) {
+          storedAnswer = window.graspleCorrectAnswers[challengeId];
+          console.log('Grasple Tools DEBUG: Found answer by ID');
+        } else if (!challengeId && window.graspleCorrectAnswers && Object.keys(window.graspleCorrectAnswers).length >= 1 && window.graspleCorrectAnswers['latest']) {
+          // If we couldn't find an ID but there's a latest answer stored, use it as fallback
+          storedAnswer = window.graspleCorrectAnswers['latest'];
+          console.log('Grasple Tools DEBUG: Using latest answer as fallback');
+        } else {
+          console.log('Grasple Tools DEBUG: No matching answer found');
+        }
+
+        if (storedAnswer) {
+          const correctBtn = createCorrectAnswerButton(originalCheckBtn.className, storedAnswer);
+          // Verify not already injected
+          if (!parent.querySelector('.grasple-correct-answer-btn')) {
+            parent.insertBefore(correctBtn, originalCheckBtn);
+            console.log('Grasple Tools: Injected View Correct Answer button for ID:', challengeId || 'latest');
+          } else {
+            console.log('Grasple Tools DEBUG: Button already exists, skipping');
+          }
+        }
+      });
+    }
+
+    // 1b. SEPARATE PASS for correct answer buttons on ALL check buttons
+    // This runs independently because the answer might be stored AFTER the button was processed
+    if (Object.keys(window.graspleCorrectAnswers || {}).length > 0) {
+      let allCheckBtns = Array.from(document.querySelectorAll('button[data-testid="check-answer-button"]'));
+      // Also try broader search
+      if (allCheckBtns.length === 0) {
+        allCheckBtns = Array.from(document.querySelectorAll('button, div[role="button"]')).filter(b => {
+          const txt = b.textContent.trim().toLowerCase();
+          return (txt.includes('check') || txt.includes('controleer'));
+        });
+      }
+
+      allCheckBtns.forEach(checkBtn => {
+        const parent = checkBtn.parentNode;
+        // Skip if button already exists
+        if (parent.querySelector('.grasple-correct-answer-btn')) return;
+
+        // Find challenge ID for this button
+        let challengeId = null;
+        let currentEl = checkBtn;
+        let header = null;
+        while (currentEl && currentEl !== document.body) {
+          currentEl = currentEl.parentElement;
+          if (currentEl) {
+            header = currentEl.querySelector('[id^="question-header-"]');
+            if (header) break;
+          }
+        }
+        if (header) {
+          const match = header.id.match(/question-header-(\d+)/);
+          if (match) challengeId = match[1];
+        }
+
+        // Check for stored answer
+        let storedAnswer = null;
+        if (challengeId && window.graspleCorrectAnswers[challengeId]) {
+          storedAnswer = window.graspleCorrectAnswers[challengeId];
+        } else if (!challengeId && window.graspleCorrectAnswers['latest']) {
+          storedAnswer = window.graspleCorrectAnswers['latest'];
+        }
+
+        if (storedAnswer) {
+          const correctBtn = createCorrectAnswerButton(checkBtn.className, storedAnswer);
+          parent.insertBefore(correctBtn, checkBtn);
+          console.log('Grasple Tools: Injected View Correct Answer button (late pass) for ID:', challengeId || 'latest');
+        }
       });
     }
 
@@ -1293,6 +1456,12 @@
       if (showExplanation) {
         const explainBtn = createExplanationButton('btn btn-warning');
         wrapper.appendChild(explainBtn);
+      }
+
+      // Add "Show Hint" button
+      if (showExplanation) {
+        const hintBtn = createShowHintButton('btn btn-info');
+        wrapper.appendChild(hintBtn);
       }
 
       // Add "Show Answer" button if enabled
@@ -1331,6 +1500,319 @@
     });
 
     return answerBtn;
+  }
+
+  // Helper to create the View Correct Answer button
+  function createCorrectAnswerButton(baseClassName, correctAnswerData) {
+    const correctBtn = document.createElement('button');
+    correctBtn.innerHTML = '<span>View Correct Answer</span>';
+    correctBtn.className = baseClassName;
+    correctBtn.classList.add('grasple-correct-answer-btn');
+
+    correctBtn.style.color = '#fff';
+    correctBtn.style.backgroundColor = '#6f42c1'; // purple
+    correctBtn.style.borderColor = '#6f42c1';
+    correctBtn.style.marginRight = '10px';
+
+    // Store the correct answer data on the button
+    correctBtn.dataset.correctAnswer = JSON.stringify(correctAnswerData);
+
+    correctBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Container is closest feedback parent or fieldset
+      const container = correctBtn.closest('grapp-question-answer-field') || correctBtn.parentNode;
+      showCorrectAnswerFromResponse(correctBtn, container);
+    });
+
+    return correctBtn;
+  }
+
+  // Show the correct answer from check-answer response
+  function showCorrectAnswerFromResponse(btn, container) {
+    let correctAnswerObj;
+    try {
+      correctAnswerObj = JSON.parse(btn.dataset.correctAnswer);
+    } catch (e) {
+      alert('Could not parse correct answer data.');
+      return;
+    }
+
+    // Extract the answer field
+    let answerValue = correctAnswerObj.answer;
+
+    if (!answerValue) {
+      alert('No answer found in correct_answer object.');
+      return;
+    }
+
+    // Format the correct answer for display
+    let answerHtml = '';
+
+    // Check if the answer is a JSON string (multiple fields case)
+    if (typeof answerValue === 'string' && answerValue.startsWith('{')) {
+      try {
+        const multiAnswers = JSON.parse(answerValue);
+        // Multiple fields - display each
+        answerHtml = '<div style="font-size: 1.1em;">';
+        let fieldNum = 1;
+        for (const [key, value] of Object.entries(multiAnswers)) {
+          // Clean up key name (student.answer2 -> Field 1)
+          const fieldLabel = 'Field ' + fieldNum;
+          answerHtml += '<p style="margin: 0.5em 0;"><strong>' + fieldLabel + ':</strong> <code style="font-size: 1.2em; background: #fff; padding: 2px 6px; border-radius: 3px;">' + value + '</code></p>';
+          fieldNum++;
+        }
+        answerHtml += '</div>';
+      } catch (e) {
+        // Not valid JSON, treat as simple string
+        answerHtml = '<p style="font-size: 1.2em;"><strong>Answer:</strong> <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">' + answerValue + '</code></p>';
+      }
+    } else {
+      // Simple single answer
+      answerHtml = '<p style="font-size: 1.2em;"><strong>Answer:</strong> <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">' + answerValue + '</code></p>';
+    }
+
+    // Use createInfoBox to display
+    createInfoBox({
+      container: container,
+      className: 'grasple-tools-correct-answer-display',
+      title: 'Correct Answer',
+      backgroundColor: '#e2d8f3', // light purple
+      borderColor: '#6f42c1',
+      titleColor: '#6f42c1',
+      content: answerHtml
+    });
+
+    console.log('Grasple Tools: Displayed correct answer from check-answer response');
+  }
+
+  // Helper function to create the Show Hint button
+  function createShowHintButton(baseClassName) {
+    const hintBtn = document.createElement('button');
+    hintBtn.innerHTML = '<span>Show Hint</span>';
+    hintBtn.className = baseClassName;
+    hintBtn.classList.add('grasple-show-hint-btn');
+
+    hintBtn.style.color = '#fff';
+    hintBtn.style.backgroundColor = '#17a2b8'; // info blue
+    hintBtn.style.borderColor = '#17a2b8';
+    hintBtn.style.marginRight = '10px';
+
+    hintBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      await showHint(hintBtn);
+    });
+
+    return hintBtn;
+  }
+
+  // Show hint for questions
+  async function showHint(btn) {
+    const challengesMap = window.graspleChallenges || {};
+    const challengesList = window.graspleChallengesList || [];
+
+    // Find the question wrapper
+    const questionWrapper = btn.closest('grapp-question.question-wrapper') ||
+      btn.closest('grapp-question');
+    const answerContainer = btn.closest('grapp-multiple-choice-single-answer') ||
+      btn.closest('grapp-multiple-choice-multiple-answers') ||
+      btn.closest('grapp-multiple-choice') ||
+      btn.closest('grapp-question-answer-field');
+
+    const container = questionWrapper || answerContainer ||
+      btn.closest('grapp-challenge') ||
+      document.body;
+
+    const searchRoot = questionWrapper || answerContainer || container;
+
+    // Find challenge using similar matching logic as showExplanation
+    let challengeInfo = null;
+
+    // Strategy 0: Fieldset ID Match
+    const fieldset = searchRoot.querySelector('fieldset[id^="question-answer-input-"]');
+    if (fieldset && fieldset.id) {
+      const match = fieldset.id.match(/question-answer-input-(\d+)/);
+      if (match) {
+        const fieldsetId = parseInt(match[1], 10);
+        if (challengesMap[fieldsetId]) {
+          challengeInfo = challengesMap[fieldsetId];
+        }
+      }
+    }
+
+    // Strategy 1: Visual ID Match
+    if (!challengeInfo) {
+      const text = searchRoot.innerText || searchRoot.textContent || '';
+      const idMatch = text.match(/(?:Question|Vraag)\s*#\s*(\d+)/i) || text.match(/#(\d{4,})/);
+      if (idMatch && challengesMap[idMatch[1]]) {
+        challengeInfo = challengesMap[idMatch[1]];
+      }
+    }
+
+    // Strategy 2: Index-based
+    if (!challengeInfo) {
+      const allHintBtns = Array.from(document.querySelectorAll('.grasple-show-hint-btn'));
+      const btnIndex = allHintBtns.indexOf(btn);
+      if (btnIndex >= 0 && btnIndex < challengesList.length) {
+        challengeInfo = challengesList[btnIndex];
+      }
+    }
+
+    if (!challengeInfo) {
+      alert('Could not find challenge data for hint. Try refreshing.');
+      return;
+    }
+
+    const challengeObj = challengeInfo.data.challenge || challengeInfo.data;
+    console.log('Grasple Tools: Showing hint for', challengeObj);
+
+    // Determine hint content
+    let hints = [];
+
+    // For input questions: use feedback_wrong
+    if (challengeObj.feedback_wrong) {
+      hints.push({ label: 'Hint', content: challengeObj.feedback_wrong });
+    }
+
+    // For MCQs: use response from incorrect answers
+    if (challengeObj.answers && challengeObj.answers.length > 0) {
+      const incorrectAnswers = challengeObj.answers.filter(a => a.right_answer === 0 && a.response);
+
+      // Get unique responses
+      const uniqueResponses = [];
+      const seenResponses = new Set();
+      for (const ans of incorrectAnswers) {
+        const normalized = ans.response.replace(/<[^>]*>/g, '').trim();
+        if (!seenResponses.has(normalized)) {
+          seenResponses.add(normalized);
+          uniqueResponses.push({ label: ans.answer.replace(/<[^>]*>/g, '').trim(), content: ans.response });
+        }
+      }
+
+      if (uniqueResponses.length > 0) {
+        hints = uniqueResponses;
+      }
+    }
+
+    if (hints.length === 0) {
+      alert('No hint available for this question.');
+      return;
+    }
+
+    // Display the hint
+    displayHint(btn, answerContainer || container, hints);
+  }
+
+  // Display hint with optional dropdown for multiple hints
+  function displayHint(btn, container, hints) {
+    // Use common info box function
+    createInfoBox({
+      container: container,
+      className: 'grasple-tools-injected-hint',
+      title: 'Hint',
+      backgroundColor: '#d1ecf1',
+      borderColor: '#bee5eb',
+      titleColor: '#0c5460',
+      content: hints.length === 1 ? hints[0].content : null,
+      multiContent: hints.length > 1 ? hints : null
+    });
+  }
+
+  /**
+   * Common function to create info boxes (for explanation and hint)
+   * Ensures consistent styling and KaTeX rendering
+   */
+  function createInfoBox(options) {
+    const {
+      container,
+      className,
+      title,
+      backgroundColor = '#f8f9fa',
+      borderColor = '#dee2e6',
+      titleColor = '#212529',
+      content = null,
+      multiContent = null  // Array of { label, content } for dropdown
+    } = options;
+
+    // Remove existing box of same type
+    let existing = container.querySelector('.' + className);
+    if (existing) {
+      existing.remove();
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = className + ' mt-3 grasple-tools-info-box';
+    wrapper.id = 'grasple-box-' + Math.random().toString(36).substr(2, 9);
+
+    let html = `
+      <grapp-question-feedback>
+        <div data-testid="container">
+          <section data-testid="question-feedback" class="question-feedback question-feedback--visible">
+            <div class="question-feedback-wrapper position-relative" style="background-color: ${backgroundColor}; border: 1px solid ${borderColor}; border-radius: 0.25rem; padding: 1rem;">
+              <h2 class="h5" style="color: ${titleColor};">${title}</h2>
+              
+              <div class="info-box-contents">
+    `;
+
+    // Log content for debugging
+    if (content) console.log('Grasple Tools Check:', content.includes('\\\\') ? 'Double Backslashes Detected' : 'Clean');
+
+    if (content) {
+      // Single content
+      html += '<div class="user-provided-html">' + content + '</div>';
+    } else if (multiContent && multiContent.length > 0) {
+      // Multiple content with dropdown
+      html += '<div style="margin-bottom: 10px;"><span style="margin-right: 8px;">Feedback for answer:</span>';
+      html += '<select class="hint-selector" style="padding: 5px; border-radius: 3px;">';
+      multiContent.forEach((item, i) => {
+        html += '<option value="' + i + '">' + item.label + '</option>';
+      });
+      html += '</select></div>';
+      multiContent.forEach((item, i) => {
+        html += '<div class="info-content-item" data-index="' + i + '" style="' + (i > 0 ? 'display:none;' : '') + '">';
+        html += '<div class="user-provided-html">' + item.content + '</div>';
+        html += '</div>';
+      });
+    }
+
+    html += `
+              </div>
+            </div>
+          </section>
+        </div>
+      </grapp-question-feedback>
+    `;
+
+    wrapper.innerHTML = html;
+
+    // Add dropdown event listener if multiple content
+    if (multiContent && multiContent.length > 1) {
+      setTimeout(() => {
+        const selector = wrapper.querySelector('.hint-selector');
+        if (selector) {
+          selector.addEventListener('change', (e) => {
+            const selectedIndex = e.target.value;
+            wrapper.querySelectorAll('.info-content-item').forEach(el => {
+              el.style.display = el.dataset.index === selectedIndex ? '' : 'none';
+            });
+            // Re-render math for newly visible content
+            window.postMessage({ type: 'GRASPLE_RENDER_MATH', id: wrapper.id }, '*');
+          });
+        }
+      }, 0);
+    }
+
+    container.appendChild(wrapper);
+
+    // Trigger math rendering
+    setTimeout(() => {
+      window.postMessage({ type: 'GRASPLE_RENDER_MATH', id: wrapper.id }, '*');
+    }, 50);
+
+    console.log('Grasple Tools: Created info box:', title);
+
+    return wrapper;
   }
 
   // Show correct answer for MCQs
@@ -1570,64 +2052,57 @@
     } else if (challengeObj.feedback_wrong) {
       explanation = challengeObj.feedback_wrong;
     } else if (challengeObj.answers && challengeObj.answers.length > 0) {
-      // MCQ: look for the correct answer's response field
-      const correctAnswer = challengeObj.answers.find(a => a.right_answer === 1);
-      if (correctAnswer && correctAnswer.response) {
-        explanation = correctAnswer.response;
+      // MCQ: look for correct answer(s) response field
+      const correctAnswers = challengeObj.answers.filter(a => a.right_answer === 1 && a.response);
+
+      if (correctAnswers.length > 1) {
+        // Multiple correct answers - use dropdown
+        const uniqueExplanations = [];
+        const seenExplanations = new Set();
+        for (const ans of correctAnswers) {
+          const normalized = ans.response.replace(/<[^>]*>/g, '').trim();
+          if (!seenExplanations.has(normalized)) {
+            seenExplanations.add(normalized);
+            uniqueExplanations.push({
+              label: ans.answer.replace(/<[^>]*>/g, '').trim(),
+              content: ans.response
+            });
+          }
+        }
+
+        if (uniqueExplanations.length > 1) {
+          // Multiple unique explanations - use dropdown
+          createInfoBox({
+            container: answerContainer || container,
+            className: 'grasple-tools-injected-feedback',
+            title: 'Explanation',
+            backgroundColor: '#f8f9fa',
+            borderColor: '#dee2e6',
+            titleColor: '#212529',
+            multiContent: uniqueExplanations
+          });
+          console.log('Grasple Tools: Injected explanation with dropdown for multiple correct answers.');
+          return;
+        } else if (uniqueExplanations.length === 1) {
+          explanation = uniqueExplanations[0].content;
+        }
+      } else if (correctAnswers.length === 1) {
+        explanation = correctAnswers[0].response;
       }
     }
 
-    // --- Rich Rendering Logic ---
+    // --- Use common info box function ---
+    createInfoBox({
+      container: answerContainer || container,
+      className: 'grasple-tools-injected-feedback',
+      title: 'Explanation',
+      backgroundColor: '#f8f9fa',
+      borderColor: '#dee2e6',
+      titleColor: '#212529',
+      content: explanation
+    });
 
-    // Check if we already injected feedback in this answerContainer - remove to refresh
-    let feedbackEl = answerContainer?.querySelector('.grasple-tools-injected-feedback') ||
-      container.querySelector('.grasple-tools-injected-feedback');
-    if (feedbackEl) {
-      feedbackEl.remove();
-    }
-
-    // Create the structure mimicking <grapp-question-feedback>
-    // We'll wrap it in a custom class to identifying it
-    const feedbackWrapper = document.createElement('div');
-    feedbackWrapper.className = 'grasple-tools-injected-feedback mt-3';
-    // Unique ID for the renderer listener
-    feedbackWrapper.id = 'grasple-feedback-' + Math.random().toString(36).substr(2, 9);
-
-    // HTML Structure based on user snippet
-    feedbackWrapper.innerHTML = `
-      <grapp-question-feedback>
-        <div data-testid="container">
-          <section data-testid="question-feedback" class="question-feedback question-feedback--visible">
-            <div class="question-feedback-wrapper position-relative" style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 0.25rem; padding: 1rem;">
-              <h2 class="h5">Explanation</h2>
-              
-              <div id="feedback-contents">
-                 <div class="user-provided-html">
-                    ${explanation}
-                 </div>
-              </div>
-
-            </div>
-          </section>
-        </div>
-      </grapp-question-feedback>
-    `;
-
-    // Insert as last child of answerContainer (for proper width)
-    // answerContainer is grapp-multiple-choice-* or grapp-question-answer-field
-    if (answerContainer) {
-      answerContainer.appendChild(feedbackWrapper);
-    } else if (container) {
-      container.appendChild(feedbackWrapper);
-    }
-
-    // Trigger Math Rendering via Injected Script (Main Context)
-    // We send a message that our injected script listens for.
-    setTimeout(() => {
-      window.postMessage({ type: 'GRASPLE_RENDER_MATH', id: feedbackWrapper.id }, '*');
-    }, 50);
-
-    console.log('Grasple Tools: Injected explanation HTML and requested render.');
+    console.log('Grasple Tools: Injected explanation via createInfoBox.');
   }
 
   /* 
@@ -1679,10 +2154,21 @@
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (node.nodeType === 1) { // Element node
+          // Skip if this is our own injected element
+          if (node.classList?.contains('grasple-tools-injected-feedback') ||
+            node.closest?.('.grasple-tools-injected-feedback')) {
+            continue;
+          }
+
           // Check if native feedback was added (grapp-question-feedback or section with question-feedback class)
-          const nativeFeedback = node.matches && node.matches('grapp-question-feedback, [data-testid="question-feedback"], .question-feedback')
+          let nativeFeedback = node.matches && node.matches('grapp-question-feedback, [data-testid="question-feedback"], .question-feedback')
             ? node
             : node.querySelector && node.querySelector('grapp-question-feedback, [data-testid="question-feedback"], .question-feedback');
+
+          // Make sure it's not inside our injected element
+          if (nativeFeedback && nativeFeedback.closest('.grasple-tools-injected-feedback')) {
+            nativeFeedback = null;
+          }
 
           if (nativeFeedback) {
             // Find the parent question wrapper

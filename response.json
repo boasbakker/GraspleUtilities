@@ -1,0 +1,173 @@
+{
+  "challenge": {
+    "id": 61582,
+    "question": "<p>What are the critical points of \\(f\\)?&nbsp;</p><p>Give your answer as a comma-separated list, for example \\(\\left(1,2\\right),\\left(3,4\\right)\\).&nbsp;</p>",
+    "description": "<p>Consider the function&nbsp;\\(f\\left(x,y\\right)=x y^{2} - 16 x - 2 y^{2} \\).&nbsp;</p>",
+    "answer_input_template": "",
+    "correct_answer": null,
+    "check_type": null,
+    "feedback": "<p>The critical points of&nbsp;\\(f\\) are when \\(\\nabla f=\\mathbf{0}\\). This gives&nbsp;</p><p>\\(f_x=y^{2} - 16 =0\\)&nbsp;and \\(f_y=2 x y - 4 y =0\\).</p><p>From the second of these equations we find&nbsp;\\(y=0\\) or&nbsp;\\(x=2 \\).&nbsp;<br>&nbsp;</p><p>If&nbsp;\\(y=0\\) the first equation becomes \\(0-16 =0\\), which has no solutions.</p><p>If&nbsp;\\(x=2 \\) the first equation becomes \\(y^2=16 \\), which has two solutions.<br>&nbsp;</p><p>Thus in total we find the two points \\(P_1=(2 ,4 )\\), and&nbsp;\\(P_2=(2 ,-4 )\\).</p>",
+    "feedback_wrong": "<p>To find the critical points solve \\(\\nabla f = \\mathbf{0}\\).&nbsp;</p>",
+    "name": "Exercise #61582",
+    "settings": {
+      "max_attempts": 2,
+      "attempt_settings": {
+        "1": {
+          "percentage_of_full_points": 100
+        },
+        "2": {
+          "percentage_of_full_points": 50
+        }
+      },
+      "feedback_at_incorrect_end_state": "correct_answer_and_detailed_solution"
+    },
+    "lock_answer_order": false,
+    "style": "open",
+    "type": "equation",
+    "challenge_set_main_id": null,
+    "mode": null,
+    "correct_challenge_transition_id": null,
+    "incorrect_challenge_transition_id": null,
+    "assignment": "",
+    "introduction": "",
+    "has_transition_logic": false,
+    "has_template": true,
+    "answer_field_settings": [],
+    "c_hash": "6",
+    "sub_challenges": [
+      {
+        "id": 61583,
+        "question": "<p>Is the point&nbsp;\\(P_1\\) (see feedback to the first subquestion) a saddle point or does the function&nbsp;\\(f(x,\\ y)\\) attain a local minimum or maximum in this point?</p>",
+        "description": "",
+        "answer_input_template": "",
+        "correct_answer": null,
+        "check_type": null,
+        "feedback": "",
+        "feedback_wrong": "",
+        "name": "",
+        "settings": {
+          "max_attempts": 2,
+          "attempt_settings": {
+            "1": {
+              "percentage_of_full_points": 100
+            }
+          },
+          "feedback_at_incorrect_end_state": "correct_answer_and_detailed_solution"
+        },
+        "lock_answer_order": true,
+        "style": "mc",
+        "type": null,
+        "challenge_set_main_id": 61582,
+        "mode": null,
+        "correct_challenge_transition_id": null,
+        "incorrect_challenge_transition_id": null,
+        "assignment": "",
+        "introduction": "",
+        "has_transition_logic": false,
+        "has_template": false,
+        "multi_answer_settings": {
+          "enabled": false
+        },
+        "answer_field_settings": [],
+        "sub_challenges": [],
+        "answers": [
+          {
+            "id": 113923,
+            "answer": "<p>saddle point</p>",
+            "response": "<p>We use the second derivative test. We have \\(\\frac{\\partial^2f}{\\partial x^2}=0 \\), \\(\\frac{\\partial^2f}{\\partial x\\partial y}=2 y \\), and \\(\\frac{\\partial^2f}{\\partial y^2}=2 x - 4 \\).</p><p>Therefore in the point&nbsp;\\(P_1\\) we have \\(D=\\left(\\frac{\\partial^2f}{\\partial x^2}\\right)\\left(\\frac{\\partial^2f}{\\partial y^2}\\right)-\\left(\\frac{\\partial^2f}{\\partial x\\partial y}\\right)^2=-64 \\lt 0\\).</p><p>Thus&nbsp;\\(P_1\\) is a saddle point for the function.</p>",
+            "right_answer": 1,
+            "feedback": null
+          },
+          {
+            "id": 113924,
+            "answer": "<p>local maximum</p>",
+            "response": "<p>Use the second derivative test.</p><p>Compute \\(D=\\left(\\frac{\\partial^2f}{\\partial x^2}\\right)\\left(\\frac{\\partial^2f}{\\partial y^2}\\right)-\\left(\\frac{\\partial^2f}{\\partial x\\partial y}\\right)^2\\).</p><p>For a local maximum you need&nbsp;\\(D\\gt 0\\) and&nbsp;\\(\\frac{\\partial^2f}{\\partial x^2}\\lt 0\\) (the latter condition can be replaced by \\(\\frac{\\partial^2f}{\\partial y^2}\\lt 0\\)). This is not the case in this problem.</p>",
+            "right_answer": 0,
+            "feedback": null
+          },
+          {
+            "id": 113925,
+            "answer": "<p>local minimum</p>",
+            "response": "<p>Use the second derivative test.</p><p>Compute \\(D=\\left(\\frac{\\partial^2f}{\\partial x^2}\\right)\\left(\\frac{\\partial^2f}{\\partial y^2}\\right)-\\left(\\frac{\\partial^2f}{\\partial x\\partial y}\\right)^2\\).</p><p>For a local minimum you need&nbsp;\\(D\\gt 0\\) and&nbsp;\\(\\frac{\\partial^2f}{\\partial x^2}\\gt 0\\) (the latter condition can be replaced by \\(\\frac{\\partial^2f}{\\partial y^2}\\gt 0\\)). This is not the case in this problem.</p>",
+            "right_answer": 0,
+            "feedback": null
+          }
+        ]
+      },
+      {
+        "id": 61584,
+        "question": "<p>Is the point&nbsp;\\(P_2\\) (see feedback to the first subquestion) a saddle point or does the function&nbsp;\\(f(x,\\ y)\\) attain a local minimum or maximum in this point?</p>",
+        "description": "",
+        "answer_input_template": "",
+        "correct_answer": null,
+        "check_type": null,
+        "feedback": "",
+        "feedback_wrong": "",
+        "name": "",
+        "settings": {
+          "max_attempts": 2,
+          "attempt_settings": {
+            "1": {
+              "percentage_of_full_points": 100
+            }
+          },
+          "feedback_at_incorrect_end_state": "correct_answer_and_detailed_solution"
+        },
+        "lock_answer_order": true,
+        "style": "mc",
+        "type": null,
+        "challenge_set_main_id": 61582,
+        "mode": null,
+        "correct_challenge_transition_id": null,
+        "incorrect_challenge_transition_id": null,
+        "assignment": "",
+        "introduction": "",
+        "has_transition_logic": false,
+        "has_template": false,
+        "multi_answer_settings": {
+          "enabled": false
+        },
+        "answer_field_settings": [],
+        "sub_challenges": [],
+        "answers": [
+          {
+            "id": 113926,
+            "answer": "<p>saddle point</p>",
+            "response": "<p>We use the second derivative test. We have \\(\\frac{\\partial^2f}{\\partial x^2}=0 \\), \\(\\frac{\\partial^2f}{\\partial x\\partial y}=2 y \\), and \\(\\frac{\\partial^2f}{\\partial y^2}=2 x - 4 \\).</p><p>Therefore in the point&nbsp;\\(P_2\\) we have \\(D=\\left(\\frac{\\partial^2f}{\\partial x^2}\\right)\\left(\\frac{\\partial^2f}{\\partial y^2}\\right)-\\left(\\frac{\\partial^2f}{\\partial x\\partial y}\\right)^2=-64 \\lt 0\\).</p><p>Thus&nbsp;\\(P_2\\) is a saddle point for the function.</p>",
+            "right_answer": 1,
+            "feedback": null
+          },
+          {
+            "id": 113927,
+            "answer": "<p>local maximum</p>",
+            "response": "<p>Use the second derivative test.</p><p>Compute \\(D=\\left(\\frac{\\partial^2f}{\\partial x^2}\\right)\\left(\\frac{\\partial^2f}{\\partial y^2}\\right)-\\left(\\frac{\\partial^2f}{\\partial x\\partial y}\\right)^2\\).</p><p>For a local maximum you need&nbsp;\\(D\\gt 0\\) and&nbsp;\\(\\frac{\\partial^2f}{\\partial x^2}\\lt 0\\) (the latter condition can be replaced by \\(\\frac{\\partial^2f}{\\partial y^2}\\lt 0\\)). This is not the case in this problem.</p>",
+            "right_answer": 0,
+            "feedback": null
+          },
+          {
+            "id": 113928,
+            "answer": "<p>local minimum</p>",
+            "response": "<p>Use the second derivative test.</p><p>Compute \\(D=\\left(\\frac{\\partial^2f}{\\partial x^2}\\right)\\left(\\frac{\\partial^2f}{\\partial y^2}\\right)-\\left(\\frac{\\partial^2f}{\\partial x\\partial y}\\right)^2\\).</p><p>For a local minimum you need&nbsp;\\(D\\gt 0\\) and&nbsp;\\(\\frac{\\partial^2f}{\\partial x^2}\\gt 0\\) (the latter condition can be replaced by \\(\\frac{\\partial^2f}{\\partial y^2}\\gt 0\\)). This is not the case in this problem.</p>",
+            "right_answer": 0,
+            "feedback": null
+          }
+        ]
+      }
+    ],
+    "answers": [],
+    "placeholder_data": [],
+    "download_data": []
+  },
+  "rights": {
+    "edit": false,
+    "copy": false,
+    "delete": false,
+    "view_edit": false,
+    "embed": false,
+    "template": false,
+    "link": false,
+    "addlogic": false,
+    "remove": false,
+    "allow_license_edit": false
+  }
+}
