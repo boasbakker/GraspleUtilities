@@ -36,6 +36,7 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "interceptor.js",
         "node_modules/katex/dist/katex.min.css",
         "node_modules/katex/dist/katex.min.js",
         "node_modules/katex/dist/contrib/auto-render.min.js",
