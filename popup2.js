@@ -14,7 +14,8 @@
     stripDecorative: false,
     aiPrompt: '',
     showExplanationButtons: true,
-    showAnswerButtons: true
+    showAnswerButtons: true,
+    showHintButtons: true
   };
 
   /**
@@ -108,7 +109,8 @@
         const message = {
           type: 'GRASPLE_SETTINGS_CHANGED',
           showExplanationButtons: showExplanationButtonsCheckbox?.checked ?? true,
-          showAnswerButtons: showAnswerButtonsCheckbox?.checked ?? true
+          showAnswerButtons: showAnswerButtonsCheckbox?.checked ?? true,
+          showHintButtons: showHintButtonsCheckbox?.checked ?? true
         };
 
         if (hasBrowser) {
@@ -127,6 +129,7 @@
   const aiPromptTextarea = document.getElementById('aiPrompt');
   const showExplanationButtonsCheckbox = document.getElementById('showExplanationButtons');
   const showAnswerButtonsCheckbox = document.getElementById('showAnswerButtons');
+  const showHintButtonsCheckbox = document.getElementById('showHintButtons');
 
   // Load saved settings on popup open
   async function loadSettings() {
@@ -143,6 +146,9 @@
     if (showAnswerButtonsCheckbox) {
       showAnswerButtonsCheckbox.checked = config.showAnswerButtons !== false;
     }
+    if (showHintButtonsCheckbox) {
+      showHintButtonsCheckbox.checked = config.showHintButtons !== false;
+    }
     if (aiPromptTextarea) {
       aiPromptTextarea.value = config.aiPrompt || '';
     }
@@ -154,7 +160,8 @@
       stripDecorative: stripDecorativeCheckbox?.checked ?? false,
       aiPrompt: aiPromptTextarea?.value ?? '',
       showExplanationButtons: showExplanationButtonsCheckbox?.checked ?? true,
-      showAnswerButtons: showAnswerButtonsCheckbox?.checked ?? true
+      showAnswerButtons: showAnswerButtonsCheckbox?.checked ?? true,
+      showHintButtons: showHintButtonsCheckbox?.checked ?? true
     };
 
     await configSet(config);
@@ -185,6 +192,9 @@
     }
     if (showAnswerButtonsCheckbox) {
       showAnswerButtonsCheckbox.addEventListener('change', saveSettings);
+    }
+    if (showHintButtonsCheckbox) {
+      showHintButtonsCheckbox.addEventListener('change', saveSettings);
     }
     if (aiPromptTextarea) {
       let timeoutId;

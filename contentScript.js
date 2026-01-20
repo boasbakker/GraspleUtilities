@@ -4,6 +4,8 @@
 (function () {
   'use strict';
 
+  console.log('Grasple Tools: version 2026-01-20-17-07');
+
   // Cross-browser compatibility
   const hasBrowser = (typeof browser !== 'undefined');
   const hasChrome = (typeof chrome !== 'undefined');
@@ -1276,13 +1278,14 @@
 
   async function runAnswerCheckInjection() {
     // Check settings
-    const config = await configGet({ showExplanationButtons: true, showAnswerButtons: true });
+    const config = await configGet({ showExplanationButtons: true, showAnswerButtons: true, showHintButtons: true });
     const showExplanation = config.showExplanationButtons !== false;
     const showAnswer = config.showAnswerButtons !== false;
+    const showHint = config.showHintButtons !== false;
 
-    // If both are disabled, nothing to do
-    if (!showExplanation && !showAnswer) {
-      console.log('Grasple Tools: Both explanation and answer buttons disabled');
+    // If all are disabled, nothing to do
+    if (!showExplanation && !showAnswer && !showHint) {
+      console.log('Grasple Tools: All buttons disabled');
       return;
     }
 
@@ -1302,16 +1305,20 @@
       checkBtns.forEach(originalCheckBtn => {
         if (originalCheckBtn.hasAttribute('data-grasple-tools-processed')) return;
 
-        console.log('Grasple Tools: Found Check button. Injecting View Explanation and Show Hint...');
+        console.log('Grasple Tools: Found Check button. Injecting buttons...');
 
         originalCheckBtn.setAttribute('data-grasple-tools-processed', 'true');
 
-        const explainBtn = createExplanationButton(originalCheckBtn.className);
-        const hintBtn = createShowHintButton(originalCheckBtn.className);
-
-        // Insert before original (hint first, then explanation)
         const parent = originalCheckBtn.parentNode;
-        parent.insertBefore(hintBtn, originalCheckBtn);
+
+        // Insert hint button if enabled
+        if (showHint) {
+          const hintBtn = createShowHintButton(originalCheckBtn.className);
+          parent.insertBefore(hintBtn, originalCheckBtn);
+        }
+
+        // Insert explanation button (always shown in this branch since showExplanation is true)
+        const explainBtn = createExplanationButton(originalCheckBtn.className);
         parent.insertBefore(explainBtn, originalCheckBtn);
 
         // Check if we have a stored correct answer for THIS specific challenge
@@ -1458,8 +1465,8 @@
         wrapper.appendChild(explainBtn);
       }
 
-      // Add "Show Hint" button
-      if (showExplanation) {
+      // Add "Show Hint" button if enabled
+      if (showHint) {
         const hintBtn = createShowHintButton('btn btn-info');
         wrapper.appendChild(hintBtn);
       }
@@ -1510,8 +1517,8 @@
     correctBtn.classList.add('grasple-correct-answer-btn');
 
     correctBtn.style.color = '#fff';
-    correctBtn.style.backgroundColor = '#6f42c1'; // purple
-    correctBtn.style.borderColor = '#6f42c1';
+    correctBtn.style.backgroundColor = '#28a745'; // green (same as Show Answer)
+    correctBtn.style.borderColor = '#28a745';
     correctBtn.style.marginRight = '10px';
 
     // Store the correct answer data on the button
