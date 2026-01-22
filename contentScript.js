@@ -106,7 +106,8 @@
       // Extract challenge ID from the URL: /challenges/XXXXX/check-answer
       let challengeId = 'latest';
       if (url) {
-        const match = url.match(/\/challenges\/(\d+)\/check-answer/);
+        // Updated regex to handle optional version segment (e.g. /61582/31/check-answer)
+        const match = url.match(/\/challenges\/(\d+)(?:\/[^\/]+)?\/check-answer/);
         if (match) {
           challengeId = match[1];
         }
@@ -140,6 +141,38 @@
         answerBtns.forEach(btn => {
           btn.style.display = message.showAnswerButtons ? '' : 'none';
         });
+
+        // Show/hide hint buttons
+        const hintBtns = document.querySelectorAll('.grasple-show-hint-btn');
+        hintBtns.forEach(btn => {
+          btn.style.display = message.showHintButtons ? '' : 'none';
+        });
+
+        // Show/hide injected content fields
+        // 1. Explanations
+        const explanationFields = document.querySelectorAll('.grasple-tools-injected-feedback');
+        explanationFields.forEach(el => {
+          el.style.display = message.showExplanationButtons ? '' : 'none';
+        });
+
+        // 2. Answers
+        const answerFields = document.querySelectorAll('.grasple-tools-correct-answer-display');
+        answerFields.forEach(el => {
+          el.style.display = message.showAnswerButtons ? '' : 'none';
+        });
+
+        // 3. Hints
+        const hintFields = document.querySelectorAll('.grasple-tools-injected-hint');
+        hintFields.forEach(el => {
+          el.style.display = message.showHintButtons ? '' : 'none';
+        });
+
+        // 4. MCQ Answers Highlighting
+        if (message.showAnswerButtons) {
+          document.body.classList.add('grasple-tools-show-answers');
+        } else {
+          document.body.classList.remove('grasple-tools-show-answers');
+        }
       }
     });
   }
@@ -1164,14 +1197,15 @@
     const showAnswer = config.showAnswerButtons !== false;
     const showHint = config.showHintButtons !== false;
 
-    // If all are disabled, nothing to do
-    if (!showExplanation && !showAnswer && !showHint) {
-      console.log('Grasple Tools: All buttons disabled');
-      return;
+    // Initialize body class for MCQ answer toggling
+    if (showAnswer) {
+      document.body.classList.add('grasple-tools-show-answers');
+    } else {
+      document.body.classList.remove('grasple-tools-show-answers');
     }
 
-    // 1. Find existing "Check" buttons - inject explanation button if enabled
-    if (showExplanation) {
+    // 1. Find existing "Check" buttons
+    {
       let checkBtns = Array.from(document.querySelectorAll('button[data-testid="check-answer-button"]'));
 
       // Fallback: check for text if testid not found
@@ -1192,14 +1226,14 @@
 
         const parent = originalCheckBtn.parentNode;
 
-        // Insert hint button if enabled
-        if (showHint) {
-          const hintBtn = createShowHintButton(originalCheckBtn.className);
-          parent.insertBefore(hintBtn, originalCheckBtn);
-        }
+        // Insert hint button
+        const hintBtn = createShowHintButton(originalCheckBtn.className);
+        if (!showHint) hintBtn.style.display = 'none';
+        parent.insertBefore(hintBtn, originalCheckBtn);
 
-        // Insert explanation button (always shown in this branch since showExplanation is true)
+        // Insert explanation button
         const explainBtn = createExplanationButton(originalCheckBtn.className);
+        if (!showExplanation) explainBtn.style.display = 'none';
         parent.insertBefore(explainBtn, originalCheckBtn);
 
         // Check if we have a stored correct answer for THIS specific challenge
@@ -1340,23 +1374,20 @@
       wrapper.style.padding = '10px 0';
       wrapper.classList.add('grasple-tools-button-wrapper');
 
-      // Add explanation button if enabled
-      if (showExplanation) {
-        const explainBtn = createExplanationButton('btn btn-warning');
-        wrapper.appendChild(explainBtn);
-      }
+      // Add explanation button
+      const explainBtn = createExplanationButton('btn btn-warning');
+      if (!showExplanation) explainBtn.style.display = 'none';
+      wrapper.appendChild(explainBtn);
 
-      // Add "Show Hint" button if enabled
-      if (showHint) {
-        const hintBtn = createShowHintButton('btn btn-info');
-        wrapper.appendChild(hintBtn);
-      }
+      // Add "Show Hint" button
+      const hintBtn = createShowHintButton('btn btn-info');
+      if (!showHint) hintBtn.style.display = 'none';
+      wrapper.appendChild(hintBtn);
 
-      // Add "Show Answer" button if enabled
-      if (showAnswer) {
-        const answerBtn = createShowAnswerButton('btn btn-success');
-        wrapper.appendChild(answerBtn);
-      }
+      // Add "Show Answer" button
+      const answerBtn = createShowAnswerButton('btn btn-success');
+      if (!showAnswer) answerBtn.style.display = 'none';
+      wrapper.appendChild(answerBtn);
 
       // Insert after instruction element, or after fieldset, or at end of container
       if (instructionEl) {
@@ -1380,6 +1411,10 @@
     answerBtn.style.backgroundColor = '#28a745';
     answerBtn.style.borderColor = '#28a745';
     answerBtn.style.marginRight = '10px';
+    // Fix visual disabled state
+    answerBtn.style.cursor = 'pointer';
+    answerBtn.style.opacity = '1';
+    answerBtn.style.pointerEvents = 'auto';
 
     answerBtn.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -1401,6 +1436,10 @@
     correctBtn.style.backgroundColor = '#28a745'; // green (same as Show Answer)
     correctBtn.style.borderColor = '#28a745';
     correctBtn.style.marginRight = '10px';
+    // Fix visual disabled state
+    correctBtn.style.cursor = 'pointer';
+    correctBtn.style.opacity = '1';
+    correctBtn.style.pointerEvents = 'auto';
 
     // Store the correct answer data on the button
     correctBtn.dataset.correctAnswer = JSON.stringify(correctAnswerData);
@@ -1460,14 +1499,21 @@
       answerHtml = '<p style="font-size: 1.2em;"><strong>Answer:</strong> <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">' + answerValue + '</code></p>';
     }
 
+    // Toggle logic: if already visible, hide it
+    const existing = container.querySelector('.grasple-tools-correct-answer-display');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
     // Use createInfoBox to display
     createInfoBox({
       container: container,
       className: 'grasple-tools-correct-answer-display',
       title: 'Correct Answer',
-      backgroundColor: '#e2d8f3', // light purple
-      borderColor: '#6f42c1',
-      titleColor: '#6f42c1',
+      backgroundColor: '#d4edda', // lighter green
+      borderColor: '#c3e6cb',
+      titleColor: '#155724',
       content: answerHtml
     });
 
@@ -1485,6 +1531,10 @@
     hintBtn.style.backgroundColor = '#17a2b8'; // info blue
     hintBtn.style.borderColor = '#17a2b8';
     hintBtn.style.marginRight = '10px';
+    // Fix visual disabled state
+    hintBtn.style.cursor = 'pointer';
+    hintBtn.style.opacity = '1';
+    hintBtn.style.pointerEvents = 'auto';
 
     hintBtn.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -1594,6 +1644,12 @@
 
   // Display hint with optional dropdown for multiple hints
   function displayHint(btn, container, hints) {
+    // Toggle logic
+    const existing = container.querySelector('.grasple-tools-injected-hint');
+    if (existing) {
+      existing.remove();
+      return;
+    }
     // Use common info box function
     createInfoBox({
       container: container,
@@ -1755,14 +1811,22 @@
       return;
     }
 
+    // Toggle logic: Check if we are already showing answers
+    // If ANY correct answer is highlighted, we assume we want to toggle OFF.
+    const alreadyShowing = Array.from(container.querySelectorAll('.grasple-mc-correct')).length > 0;
+
+    if (alreadyShowing) {
+      container.querySelectorAll('.grasple-mc-correct').forEach(el => el.classList.remove('grasple-mc-correct'));
+      return;
+    }
+
     // Highlight the correct answer(s) in the UI
     correctAnswers.forEach(correct => {
       const radioInput = container.querySelector(`input[value="${correct.id}"]`);
       if (radioInput) {
         const label = radioInput.closest('label') || radioInput.parentElement;
         if (label) {
-          label.style.border = '3px solid #28a745';
-          label.style.backgroundColor = '#d4edda';
+          label.classList.add('grasple-mc-correct');
         }
       }
     });
@@ -1801,6 +1865,10 @@
     explainBtn.style.backgroundColor = '#ffc107';
     explainBtn.style.borderColor = '#ffc107';
     explainBtn.style.marginRight = '10px';
+    // Fix visual disabled state
+    explainBtn.style.cursor = 'pointer';
+    explainBtn.style.opacity = '1';
+    explainBtn.style.pointerEvents = 'auto';
 
     explainBtn.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -1979,6 +2047,13 @@
       }
     }
 
+    // Toggle logic
+    const existing = (answerContainer || container).querySelector('.grasple-tools-injected-feedback');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
     // --- Use common info box function ---
     createInfoBox({
       container: answerContainer || container,
@@ -2091,5 +2166,15 @@
 
   // Run the check once on script load.
   runInjectionCheck();
+
+  // Inject Custom Styles for Toggling
+  const style = document.createElement('style');
+  style.textContent = `
+    body.grasple-tools-show-answers .grasple-mc-correct {
+        border: 3px solid #28a745 !important;
+        background-color: #d4edda !important;
+    }
+  `;
+  (document.head || document.documentElement).appendChild(style);
 
 })();
