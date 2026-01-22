@@ -136,8 +136,8 @@
           btn.style.display = message.showExplanationButtons ? '' : 'none';
         });
 
-        // Show/hide answer buttons
-        const answerBtns = document.querySelectorAll('.grasple-show-answer-btn');
+        // Show/hide answer buttons (MCQ + Input)
+        const answerBtns = document.querySelectorAll('.grasple-show-answer-btn, .grasple-correct-answer-btn');
         answerBtns.forEach(btn => {
           btn.style.display = message.showAnswerButtons ? '' : 'none';
         });
@@ -173,6 +173,9 @@
         } else {
           document.body.classList.remove('grasple-tools-show-answers');
         }
+
+        // Toggle logic fix: Ensure no conflicting removals
+        // (Nothing needed here, the main issue is in the toggle function itself)
       }
     });
   }
@@ -1288,6 +1291,7 @@
 
         if (storedAnswer) {
           const correctBtn = createCorrectAnswerButton(originalCheckBtn.className, storedAnswer);
+          if (!showAnswer) correctBtn.style.display = 'none';
           // Verify not already injected
           if (!parent.querySelector('.grasple-correct-answer-btn')) {
             parent.insertBefore(correctBtn, originalCheckBtn);
@@ -1342,6 +1346,7 @@
 
         if (storedAnswer) {
           const correctBtn = createCorrectAnswerButton(checkBtn.className, storedAnswer);
+          if (!showAnswer) correctBtn.style.display = 'none';
           parent.insertBefore(correctBtn, checkBtn);
           console.log('Grasple Tools: Injected View Correct Answer button (late pass) for ID:', challengeId || 'latest');
         }
@@ -1506,6 +1511,9 @@
       return;
     }
 
+    // Toggle logic: Close other boxes (Exclusive Mode)
+    closeOtherBoxes(container);
+
     // Use createInfoBox to display
     createInfoBox({
       container: container,
@@ -1650,6 +1658,10 @@
       existing.remove();
       return;
     }
+
+    // Toggle logic: Close other boxes (Exclusive Mode)
+    closeOtherBoxes(container);
+
     // Use common info box function
     createInfoBox({
       container: container,
@@ -1660,6 +1672,21 @@
       titleColor: '#0c5460',
       content: hints.length === 1 ? hints[0].content : null,
       multiContent: hints.length > 1 ? hints : null
+    });
+  }
+
+  /**
+   * Helper to close other injected boxes in the same container (Exclusive Mode)
+   */
+  function closeOtherBoxes(container) {
+    if (!container) return;
+    const selectors = [
+      '.grasple-tools-injected-hint',
+      '.grasple-tools-injected-feedback',
+      '.grasple-tools-correct-answer-display'
+    ];
+    selectors.forEach(sel => {
+      container.querySelectorAll(sel).forEach(el => el.remove());
     });
   }
 
@@ -2053,6 +2080,9 @@
       existing.remove();
       return;
     }
+
+    // Toggle logic: Close other boxes (Exclusive Mode)
+    closeOtherBoxes(answerContainer || container);
 
     // --- Use common info box function ---
     createInfoBox({
