@@ -29,7 +29,7 @@ function injectInterceptor() {
 
     // Inject interceptor script as external file (required for Chrome MV3 CSP)
     const script = document.createElement('script');
-    script.src = api.runtime.getURL('interceptor.js');
+    script.src = api.runtime.getURL('src/injectedInterceptor.js');
     script.onload = function () {
         console.log('Grasple Tools: Interceptor script loaded');
         script.remove(); // Clean up after loading

@@ -14,7 +14,7 @@
   ],
   "background": {
     "scripts": [
-      "background.js"
+      "src/background.js"
     ]
   },
   "content_scripts": [
@@ -48,12 +48,12 @@
   ],
   "action": {
     "default_title": "Copy exercise text and LaTeX",
-    "default_popup": "popup.html"
+    "default_popup": "src/popup.html"
   },
   "web_accessible_resources": [
     {
       "resources": [
-        "interceptor.js",
+        "src/injectedInterceptor.js",
         "node_modules/katex/dist/katex.min.css",
         "node_modules/katex/dist/katex.min.js",
         "node_modules/katex/dist/contrib/auto-render.min.js",
