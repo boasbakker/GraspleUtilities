@@ -23,7 +23,24 @@
         "https://app.grasple.com/*"
       ],
       "js": [
-        "contentScript.js"
+        "src/api.js",
+        "src/state.js",
+        "src/config.js",
+        "src/helpers.js",
+        "src/interceptor.js",
+        "src/messageHandlers.js",
+        "src/extraction.js",
+        "src/buttons/copyButton.js",
+        "src/buttons/aiButtons.js",
+        "src/injection.js",
+        "src/answerCheck/infoBox.js",
+        "src/answerCheck/feedback.js",
+        "src/answerCheck/handlers.js",
+        "src/answerCheck/buttons.js",
+        "src/answerCheck/index.js",
+        "src/styles.js",
+        "src/observer.js",
+        "src/main.js"
       ],
       "run_at": "document_idle",
       "all_frames": true
