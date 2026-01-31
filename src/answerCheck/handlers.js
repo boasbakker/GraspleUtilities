@@ -22,28 +22,40 @@ function showCorrectAnswerFromResponse(btn, container) {
 
     // Format the correct answer for display
     let answerHtml = '';
+    let copyText = ''; // Text to copy to clipboard
+
+    // Helper to create a copy button for a value
+    const createCopyBtn = (value, inline = false) => {
+        const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+        const style = inline
+            ? "margin-left: 8px; padding: 2px 8px; background: #155724; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 0.8em;"
+            : "margin-top: 8px; padding: 4px 12px; background: #155724; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;";
+        return `<button class="grasple-copy-answer-btn" onclick="(function(btn){navigator.clipboard.writeText('${escaped}').then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy';},1500);}).catch(function(){btn.textContent='Failed';});})(this)" style="${style}">Copy</button>`;
+    };
 
     // Check if the answer is a JSON string (multiple fields case)
     if (typeof answerValue === 'string' && answerValue.startsWith('{')) {
         try {
             const multiAnswers = JSON.parse(answerValue);
-            // Multiple fields - display each
+            // Multiple fields - display each with individual copy buttons
             answerHtml = '<div style="font-size: 1.1em;">';
             let fieldNum = 1;
             for (const [key, value] of Object.entries(multiAnswers)) {
                 // Clean up key name (student.answer2 -> Field 1)
                 const fieldLabel = 'Field ' + fieldNum;
-                answerHtml += '<p style="margin: 0.5em 0;"><strong>' + fieldLabel + ':</strong> <code style="font-size: 1.2em; background: #fff; padding: 2px 6px; border-radius: 3px;">' + value + '</code></p>';
+                answerHtml += '<p style="margin: 0.5em 0;"><strong>' + fieldLabel + ':</strong> <code style="font-size: 1.2em; background: #fff; padding: 2px 6px; border-radius: 3px;">' + value + '</code>' + createCopyBtn(value, true) + '</p>';
                 fieldNum++;
             }
             answerHtml += '</div>';
         } catch (e) {
             // Not valid JSON, treat as simple string
             answerHtml = '<p style="font-size: 1.2em;"><strong>Answer:</strong> <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">' + answerValue + '</code></p>';
+            answerHtml += createCopyBtn(answerValue);
         }
     } else {
         // Simple single answer
         answerHtml = '<p style="font-size: 1.2em;"><strong>Answer:</strong> <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">' + answerValue + '</code></p>';
+        answerHtml += createCopyBtn(answerValue);
     }
 
     // Toggle logic: if already visible, hide it
