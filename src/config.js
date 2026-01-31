@@ -5,7 +5,8 @@
 // Default configuration values
 const DEFAULT_CONFIG = {
     stripDecorative: false,
-    aiPrompt: ''
+    aiPrompt: '',
+    autoFetchDelay: 100
 };
 
 /**

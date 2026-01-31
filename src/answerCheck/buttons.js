@@ -1,6 +1,7 @@
 // src/answerCheck/buttons.js - Answer check button factories
 
-// Dependencies: handlers.js (showCorrectAnswer, showHint, showExplanation, showCorrectAnswerFromResponse)
+// Dependencies: handlers.js (showCorrectAnswer, showHint, showExplanation, showCorrectAnswerFromResponse, fetchCorrectAnswer)
+
 
 // Helper function to create the Show Answer button for MCQs
 function createShowAnswerButton(baseClassName) {
@@ -55,6 +56,33 @@ function createCorrectAnswerButton(baseClassName, correctAnswerData) {
     });
 
     return correctBtn;
+}
+
+// Helper fetch answer button
+function createFetchAnswerButton(baseClassName) {
+    const fetchBtn = document.createElement('button');
+    fetchBtn.innerHTML = '<span>Get Correct Answer</span>';
+    fetchBtn.className = baseClassName;
+    fetchBtn.classList.add('grasple-fetch-answer-btn');
+
+    // Distinct color (e.g., Purple or similar to Hint but darker)
+    fetchBtn.style.color = '#fff';
+    fetchBtn.style.backgroundColor = '#6f42c1'; // Purple
+    fetchBtn.style.borderColor = '#6f42c1';
+    fetchBtn.style.marginRight = '10px';
+
+    // Fix visual disabled state
+    fetchBtn.style.cursor = 'pointer';
+    fetchBtn.style.opacity = '1';
+    fetchBtn.style.pointerEvents = 'auto';
+
+    fetchBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await fetchCorrectAnswer(fetchBtn);
+    });
+
+    return fetchBtn;
 }
 
 // Helper function to create the Show Hint button

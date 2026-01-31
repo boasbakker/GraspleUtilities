@@ -70,6 +70,143 @@ function showCorrectAnswerFromResponse(btn, container) {
     console.log('Grasple Tools: Displayed correct answer from check-answer response');
 }
 
+// Fetch correct answer for input questions
+async function fetchCorrectAnswer(btnOrElement, silent = false, explicitChallengeId = null) {
+    const btn = btnOrElement;
+    const challengesMap = window.graspleChallenges || {};
+
+    // Find challenge ID using existing logic (similar to showExplanation)
+    const questionWrapper = btn.closest('grapp-question.question-wrapper') || btn.closest('grapp-question');
+    const container = questionWrapper || btn.closest('grapp-challenge') || document.body;
+
+    let challengeId = explicitChallengeId;
+
+    // Strategy 0: Header ID
+    if (!challengeId && questionWrapper) {
+        const header = questionWrapper.querySelector('[id^="question-header-"]');
+        if (header) {
+            const match = header.id.match(/question-header-(\d+)/);
+            if (match) challengeId = match[1];
+        }
+    }
+
+    // Strategy 1: Fieldset ID Match
+    if (!challengeId) {
+        const fieldset = container.querySelector('fieldset[id^="question-answer-input-"]');
+        if (fieldset && fieldset.id) {
+            const match = fieldset.id.match(/question-answer-input-(\d+)/);
+            if (match) challengeId = match[1];
+        }
+    }
+
+    if (!challengeId) {
+        // Try falling back to challenge object in map if we have only one
+        const keys = Object.keys(challengesMap);
+        if (keys.length === 1) challengeId = keys[0];
+    }
+
+    if (!challengeId || !challengesMap[challengeId]) {
+        if (!silent) alert('Could not identify challenge. Try refreshing.');
+        return;
+    }
+
+    const challengeInfo = challengesMap[challengeId];
+    const challengeObj = challengeInfo.data.challenge || challengeInfo.data;
+
+    // Construct URL: /backend/api/public/api/v0.1/courses/.../check-answer
+    // The captured challenge info contains the 'url' from origin challenge request.
+    // e.g. .../challenges/60688
+    // We need to append /84/check-answer or just /check-answer depending on structure
+    // The HAR shows: .../challenges/60688/84/check-answer
+    // '84' seems to be a row_id or similar. 
+    // Wait, let's check the challenge object for 'row_id' or similar.
+    // Or we can just use the URL from the captured challenge request and append /check-answer?
+    // The captured URL is usually: .../challenges/60688
+    // If there is a sub-id (like 84), it might be in the challenge object or query params.
+
+    // Let's look at the captured URL.
+    let baseApiUrl = challengeInfo.url;
+    if (!baseApiUrl) {
+        if (!silent) alert('Original request URL missing. Cannot fetch.');
+        return;
+    }
+
+    // Remove query params
+    baseApiUrl = baseApiUrl.split('?')[0];
+
+    // If the URL ends with a number that isn't the challenge ID, it might already be specific.
+    // HAR: .../challenges/60688/84/check-answer
+    // Challenge ID: 60688
+    // If base is .../challenges/60688, we might need that extra ID.
+    // Where does '84' come from? URL param 'row_id=84' in HAR page URL.
+    // In the challenge object, maybe?
+
+    // Let's try constructing a standard check-answer URL.
+    // If we don't have the exact sub-ID, maybe just appending /check-answer works or we need to find that ID.
+    // Use the `c_hash` from captured info.
+
+    // Construct payload
+    // { "answer": "\\", "c_hash": "...", "challenge_session_id": ... }
+    const cHash = challengeInfo.c_hash_from_url || "4"; // Fallback to 4?
+
+    let sessionId = 0;
+    if (window.graspleSessionData && window.graspleSessionData.id) {
+        sessionId = window.graspleSessionData.id;
+    }
+
+    // Prepare the URL
+    // If the base URL was the GET request for the challenge, we can likely post to it + /check-answer?
+    // Actually, sometimes the GET is .../challenges/60688
+    // And POST is .../challenges/60688/check-answer (or with that extra ID).
+    // Let's try appending /check-answer to the base challenge URL.
+    // But we need to handle that weird '84'.
+    // Logic: if URL doesn't end in /check-answer, append it.
+    // If the original URL had that extra ID segment, it remains.
+
+    // Important: The challenge request URL in HAR is:
+    // GET .../challenges/60688?hash=4&row_id=84
+    // Wait, checking HAR...
+    // The GET request isn't fully visible in my snippet for the challenge itself, only the check-answer POST.
+    // POST: .../challenges/60688/84/check-answer
+    // Page URL: .../exercises/60688?hash=4&row_id=84
+
+    // We should try to preserve the structure of the captured URL from the CHALLENGE_INFO message.
+    // If that URL was .../challenges/60688/84, then appending /check-answer is perfect.
+    // If it was .../challenges/60688, we might miss the 84.
+    // However, the interceptor captures the URL of the request that returned the challenge.
+    // So if the app requested .../60688/84, we have that.
+
+    let fetchUrl = baseApiUrl;
+    if (!fetchUrl.endsWith('/check-answer')) {
+        fetchUrl = fetchUrl.replace(/\/$/, '') + '/check-answer';
+    }
+
+    const payload = {
+        "answer": "\\", // Dummy answer (backslash often triggers parse error but returns valid feedback/answer)
+        "c_hash": cHash,
+        "challenge_session_id": sessionId
+    };
+
+    // Change button state
+    if (!silent && btn && btn.tagName === 'BUTTON') {
+        btn.innerHTML = '<span>Fetching...</span>';
+        btn.disabled = true;
+    }
+
+    // Send message to interceptor to perform fetch
+    window.postMessage({
+        type: 'GRASPLE_FETCH_ANSWER',
+        url: fetchUrl,
+        payload: payload
+    }, '*');
+
+    // The interceptor will send the request. 
+    // The response will be captured by the SAME interceptor logic that catches normal check-answers.
+    // That logic emits GRASPLE_CHECK_ANSWER_RESPONSE.
+    // messageHandlers.js listens to that and updates state.
+    // validation/injection loop updates the UI.
+}
+
 // Show hint for questions
 async function showHint(btn) {
     const challengesMap = window.graspleChallenges || {};

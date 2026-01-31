@@ -69,9 +69,22 @@ function setupMessageListeners() {
             if (payload.correct_answer) {
                 window.graspleCorrectAnswers[challengeId] = payload.correct_answer;
                 // Also store as 'latest' for fallback matching
-                window.graspleCorrectAnswers['latest'] = payload.correct_answer;
                 console.log('Grasple Tools: Stored correct answer for challenge', challengeId);
+
+                // Trigger re-injection to show the button immediately
+                if (typeof runAnswerCheckInjection === 'function') {
+                    runAnswerCheckInjection();
+                }
             }
+        }
+        if (event.data.type === 'GRASPLE_URL_CHANGED') {
+            console.log('Grasple Tools: URL changed - Clearing stored correct answers');
+            // Clear all stored answers to prevent leakage across questions
+            window.graspleCorrectAnswers = {};
+            // DO NOT clear challenge map, as we might return to same challenge? 
+            // Actually, keep challenge map but clear answers.
+            // also clear 'latest'
+            // window.graspleCorrectAnswers['latest'] = null; // Handled by reassignment above
         }
     });
 }

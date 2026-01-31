@@ -12,8 +12,49 @@
         return open.apply(this, arguments);
     };
 
+    // Monitor URL changes to clear stale answer data
+    let lastUrl = window.location.href;
+    // Monkey patch pushState and replaceState
+    const pushState = history.pushState;
+    history.pushState = function () {
+        const ret = pushState.apply(this, arguments);
+        onUrlChange();
+        return ret;
+    };
+    const replaceState = history.replaceState;
+    history.replaceState = function () {
+        const ret = replaceState.apply(this, arguments);
+        onUrlChange();
+        return ret;
+    };
+    window.addEventListener('popstate', onUrlChange);
+    window.addEventListener('hashchange', onUrlChange);
+
+    function onUrlChange() {
+        const currentUrl = window.location.href;
+        if (currentUrl !== lastUrl) {
+            console.log('Grasple Tools: URL changed to', currentUrl, '- notifying content script');
+            lastUrl = currentUrl;
+            window.postMessage({ type: 'GRASPLE_URL_CHANGED', url: currentUrl }, '*');
+        }
+    }
+
+    // Store captured headers for replay
+    // Store captured headers for replay
+    window.graspleHeaders = {};
+    const UNSAFE_HEADERS = new Set(['content-length', 'host', 'connection', 'origin', 'referer', 'cookie', 'user-agent', 'accept-encoding']);
+
     const setRequestHeader = XHR.setRequestHeader;
     XHR.setRequestHeader = function (header, value) {
+        // Capture ALL valid headers
+        if (header && value) {
+            const key = header.toLowerCase();
+            if (!UNSAFE_HEADERS.has(key)) {
+                window.graspleHeaders[header] = value;
+            }
+        }
+
+        // Legacy support for specific token message if needed elsewhere
         if (header.toLowerCase() === 'authorization') {
             window.postMessage({ type: 'GRASPLE_AUTH_TOKEN', token: value }, '*');
         }
@@ -104,6 +145,71 @@
                     const possibleKeys = Object.keys(window).filter(k => k.toLowerCase().includes('math') || k.toLowerCase().includes('katex'));
                     console.log('Grasple Tools: Possible math objects:', possibleKeys);
                 }
+            }
+        }
+    });
+
+    // Listen for Fetch Answer requests (Check Answer)
+    window.addEventListener('message', function (e) {
+        if (e.data && e.data.type === 'GRASPLE_FETCH_ANSWER') {
+            const { url, payload } = e.data;
+            console.log('Grasple Tools: Fetching answer from', url);
+
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url, true);
+                xhr.withCredentials = true; // IMPORTANT for cookies
+
+                // Content-Type default
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
+
+                // Replay captured headers
+                if (window.graspleHeaders) {
+                    for (const [key, val] of Object.entries(window.graspleHeaders)) {
+                        // Skip Content-Type if we set it above, or let it overwrite?
+                        // Usually JSON payload needs specific content type.
+                        if (key.toLowerCase() === 'content-type') continue;
+                        try {
+                            xhr.setRequestHeader(key, val);
+                        } catch (err) {
+                            console.warn('Grasple Tools: Could not set header', key, err);
+                        }
+                    }
+                }
+
+                // Explicitly ensure Authorization is set if we have it separately (redundant but safe)
+                if (window.graspleAuthToken && (!window.graspleHeaders || !window.graspleHeaders['Authorization'])) {
+                    xhr.setRequestHeader('Authorization', window.graspleAuthToken);
+                }
+
+                xhr.onload = function () {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            console.log('Grasple Tools: Fetched answer successfully', data);
+                            // We don't need to manually post back GRASPLE_CHECK_ANSWER_RESPONSE 
+                            // because the interceptor's send() hook will catch THIS request's response too!
+                            // ...Wait, standard XHR interception wraps prototype.send.
+                            // If we use new XMLHttpRequest(), it uses the WRAPPED send.
+                            // So the existing logic in XHR.send wrapper (lines 23-64) will auto-capture this response.
+                            // NICE.
+                        } catch (err) {
+                            console.error('Grasple Tools: Error parsing fetched answer', err);
+                        }
+                    } else {
+                        console.error('Grasple Tools: Fetch answer failed', xhr.status, xhr.statusText);
+                    }
+                };
+
+                xhr.onerror = function () {
+                    console.error('Grasple Tools: Fetch answer network error');
+                };
+
+                xhr.send(JSON.stringify(payload));
+
+            } catch (err) {
+                console.error('Grasple Tools: Error sending fetch answer request', err);
             }
         }
     });

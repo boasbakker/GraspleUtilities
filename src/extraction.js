@@ -38,6 +38,14 @@ async function extractAndCopy(stripDecorative, doCopy = true) {
                 if (el.matches && el.matches('p.fs-7.fst-italic')) return true;
                 // if (el.matches && el.matches('grapp-question-answer-field')) return true;
                 if (el.matches && el.matches('button[data-testid="next-button"]')) return true;
+
+                // Exclude attempts feedback
+                if (el.matches && el.matches('[data-testid="attempts-and-points-feedback"]')) return true;
+
+                // Exclude retry button and its wrapper
+                if (el.matches && el.matches('[data-testid="retry-button"]')) return true;
+                if (el.matches && el.matches('div.position-absolute.top-0.end-0')) return true;
+
             } catch (e) { }
             return false;
         }
