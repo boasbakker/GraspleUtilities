@@ -113,18 +113,31 @@ async function fetchCorrectAnswer(btnOrElement, silent = false, explicitChalleng
     const challengeInfo = challengesMap[challengeId];
     const challengeObj = challengeInfo.data.challenge || challengeInfo.data;
 
-    // Construct URL: /backend/api/public/api/v0.1/courses/.../check-answer
-    // The captured challenge info contains the 'url' from origin challenge request.
-    // e.g. .../challenges/60688
-    // We need to append /84/check-answer or just /check-answer depending on structure
-    // The HAR shows: .../challenges/60688/84/check-answer
-    // '84' seems to be a row_id or similar. 
-    // Wait, let's check the challenge object for 'row_id' or similar.
-    // Or we can just use the URL from the captured challenge request and append /check-answer?
-    // The captured URL is usually: .../challenges/60688
-    // If there is a sub-id (like 84), it might be in the challenge object or query params.
+    // Extract answer field references from challenge's answer_input_template
+    // The template contains elements like: <answer-field ref="student.answer1" .../>
+    // We need to extract all ref values and build a JSON object
+    const answerFields = extractAnswerFieldRefs(challengeObj);
+    console.log('Grasple Tools: Extracted answer fields:', answerFields);
 
-    // Let's look at the captured URL.
+    // Build the properly formatted answer payload
+    // Grasple expects: {"student.answer1":"\\", "student.answer1.1":"\\", ...}
+    const answerObject = {};
+    const dummyAnswer = "\\\\"; // Escaped backslash that triggers parse error but returns correct answer
+
+    if (answerFields.length > 0) {
+        answerFields.forEach(fieldRef => {
+            answerObject[fieldRef] = dummyAnswer;
+        });
+    } else {
+        // Fallback: use default field name
+        answerObject["student.answer1"] = dummyAnswer;
+    }
+
+    // The answer must be stringified JSON
+    const answerString = JSON.stringify(answerObject);
+    console.log('Grasple Tools: Constructed answer payload:', answerString);
+
+    // Get the base API URL from captured challenge info
     let baseApiUrl = challengeInfo.url;
     if (!baseApiUrl) {
         if (!silent) alert('Original request URL missing. Cannot fetch.');
@@ -134,55 +147,22 @@ async function fetchCorrectAnswer(btnOrElement, silent = false, explicitChalleng
     // Remove query params
     baseApiUrl = baseApiUrl.split('?')[0];
 
-    // If the URL ends with a number that isn't the challenge ID, it might already be specific.
-    // HAR: .../challenges/60688/84/check-answer
-    // Challenge ID: 60688
-    // If base is .../challenges/60688, we might need that extra ID.
-    // Where does '84' come from? URL param 'row_id=84' in HAR page URL.
-    // In the challenge object, maybe?
-
-    // Let's try constructing a standard check-answer URL.
-    // If we don't have the exact sub-ID, maybe just appending /check-answer works or we need to find that ID.
-    // Use the `c_hash` from captured info.
-
-    // Construct payload
-    // { "answer": "\\", "c_hash": "...", "challenge_session_id": ... }
-    const cHash = challengeInfo.c_hash_from_url || "4"; // Fallback to 4?
+    // Use the `c_hash` from captured info
+    const cHash = challengeInfo.c_hash_from_url || "4";
 
     let sessionId = 0;
     if (window.graspleSessionData && window.graspleSessionData.id) {
         sessionId = window.graspleSessionData.id;
     }
 
-    // Prepare the URL
-    // If the base URL was the GET request for the challenge, we can likely post to it + /check-answer?
-    // Actually, sometimes the GET is .../challenges/60688
-    // And POST is .../challenges/60688/check-answer (or with that extra ID).
-    // Let's try appending /check-answer to the base challenge URL.
-    // But we need to handle that weird '84'.
-    // Logic: if URL doesn't end in /check-answer, append it.
-    // If the original URL had that extra ID segment, it remains.
-
-    // Important: The challenge request URL in HAR is:
-    // GET .../challenges/60688?hash=4&row_id=84
-    // Wait, checking HAR...
-    // The GET request isn't fully visible in my snippet for the challenge itself, only the check-answer POST.
-    // POST: .../challenges/60688/84/check-answer
-    // Page URL: .../exercises/60688?hash=4&row_id=84
-
-    // We should try to preserve the structure of the captured URL from the CHALLENGE_INFO message.
-    // If that URL was .../challenges/60688/84, then appending /check-answer is perfect.
-    // If it was .../challenges/60688, we might miss the 84.
-    // However, the interceptor captures the URL of the request that returned the challenge.
-    // So if the app requested .../60688/84, we have that.
-
+    // Append /check-answer to URL if needed
     let fetchUrl = baseApiUrl;
     if (!fetchUrl.endsWith('/check-answer')) {
         fetchUrl = fetchUrl.replace(/\/$/, '') + '/check-answer';
     }
 
     const payload = {
-        "answer": "\\", // Dummy answer (backslash often triggers parse error but returns valid feedback/answer)
+        "answer": answerString,
         "c_hash": cHash,
         "challenge_session_id": sessionId
     };
@@ -205,6 +185,36 @@ async function fetchCorrectAnswer(btnOrElement, silent = false, explicitChalleng
     // That logic emits GRASPLE_CHECK_ANSWER_RESPONSE.
     // messageHandlers.js listens to that and updates state.
     // validation/injection loop updates the UI.
+}
+
+// Helper function to extract answer field references from challenge template
+// Note: Only extracts from the specific challenge's template, not sub_challenges
+// (sub_challenges are registered separately and fetched with their own requests)
+function extractAnswerFieldRefs(challengeObj) {
+    const fields = [];
+
+    // Only check the specific challenge's answer_input_template
+    // (Do NOT include sub_challenges - they have their own entries in graspleChallenges)
+    if (challengeObj.answer_input_template) {
+        const mainFields = parseAnswerFieldRefs(challengeObj.answer_input_template);
+        fields.push(...mainFields);
+    }
+
+    return fields;
+}
+
+// Parse answer-field refs from template HTML
+function parseAnswerFieldRefs(template) {
+    const fields = [];
+    // Match <answer-field ref="student.answer1" .../> patterns
+    const regex = /<answer-field[^>]+ref=["']([^"']+)["'][^>]*\/?>/gi;
+    let match;
+    while ((match = regex.exec(template)) !== null) {
+        if (match[1] && !fields.includes(match[1])) {
+            fields.push(match[1]);
+        }
+    }
+    return fields;
 }
 
 // Show hint for questions

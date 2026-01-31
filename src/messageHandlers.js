@@ -20,14 +20,26 @@ function setupMessageListeners() {
                 if (challengeObj.sub_challenges && challengeObj.sub_challenges.length > 0) {
                     challengeObj.sub_challenges.forEach(subChallenge => {
                         if (subChallenge.id) {
+                            // Construct the sub-challenge's own URL by replacing the parent ID with sub-challenge ID
+                            // Parent URL: .../challenges/69854/10?c_hash=12
+                            // Sub URL:    .../challenges/69857/10?c_hash=12
+                            let subChallengeUrl = payload.url;
+                            if (payload.url && challengeObj.id) {
+                                // Replace the parent challenge ID with the sub-challenge ID in the URL
+                                subChallengeUrl = payload.url.replace(
+                                    `/challenges/${challengeObj.id}`,
+                                    `/challenges/${subChallenge.id}`
+                                );
+                            }
+
                             // Wrap in same structure as main challenges
                             window.graspleChallenges[subChallenge.id] = {
                                 data: { challenge: subChallenge },
-                                url: payload.url,
+                                url: subChallengeUrl,
                                 c_hash_from_url: payload.c_hash_from_url,
                                 parent_id: challengeObj.id
                             };
-                            console.log('Grasple Tools: Captured sub_challenge (MCQ)', subChallenge.id);
+                            console.log('Grasple Tools: Captured sub_challenge', subChallenge.id, 'with URL:', subChallengeUrl);
                         }
                     });
                 }
@@ -81,6 +93,7 @@ function setupMessageListeners() {
             console.log('Grasple Tools: URL changed - Clearing stored correct answers');
             // Clear all stored answers to prevent leakage across questions
             window.graspleCorrectAnswers = {};
+            window.graspleFetchingIds = new Set();
             // DO NOT clear challenge map, as we might return to same challenge? 
             // Actually, keep challenge map but clear answers.
             // also clear 'latest'

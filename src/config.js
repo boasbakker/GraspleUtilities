@@ -6,7 +6,7 @@
 const DEFAULT_CONFIG = {
     stripDecorative: false,
     aiPrompt: '',
-    autoFetchDelay: 100
+    autoFetchDelay: 50
 };
 
 /**
