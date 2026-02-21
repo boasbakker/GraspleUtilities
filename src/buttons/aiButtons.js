@@ -75,6 +75,6 @@ function createAskChatGPTButton() {
 }
 
 function createAskGeminiButton() {
-    const urlTemplate = 'https://aistudio.google.com/prompts/new_chat?model=gemini-3-flash-preview&prompt={prompt}';
+    const urlTemplate = 'https://aistudio.google.com/prompts/new_chat?model=gemini-3.1-pro-preview&prompt={prompt}';
     return createAIHelperButton('Gemini', 'ask-gemini-button', urlTemplate);
 }
